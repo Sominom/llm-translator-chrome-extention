@@ -44,7 +44,7 @@
       "48": "assets/icon/icon48.png",
       "128": "assets/icon/icon128.png"
     },
-    "default_title": "Quick Translator - 사이드패널 열기"
+    "default_title": "LLM Translator - 사이드패널 열기"
   },
   "background": {
     "service_worker": "js/background.js",
