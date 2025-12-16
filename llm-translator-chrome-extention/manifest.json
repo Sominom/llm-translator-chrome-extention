@@ -9,11 +9,6 @@
     "storage"
   ],
   "host_permissions": [
-    "https://api.openai.com/*",
-    "http://localhost:11434/*",
-    "https://localhost:11434/*",
-    "http://localhost:1234/*",
-    "https://localhost:1234/*",
     "<all_urls>"
   ],
   "side_panel": {
@@ -38,7 +33,7 @@
       "48": "assets/icon/icon48.png",
       "128": "assets/icon/icon128.png"
     },
-    "default_title": "LLM Translator - 사이드패널 열기"
+    "default_title": "LLM Translator"
   },
   "background": {
     "service_worker": "js/background.js",
