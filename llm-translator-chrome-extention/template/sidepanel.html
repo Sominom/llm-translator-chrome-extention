@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Quick Translator</title>
+  <link rel="stylesheet" href="../css/sidepanel.css">
+</head>
+
+<body>
+  <div class="title-container">
+    <h1>Quick Translator</h1>
+    <div class="tab-container">
+      <button class="tab-button active" data-tab="translate">번역</button>
+      <button class="tab-button" data-tab="settings">설정</button>
+    </div>
+  </div>
+
+  <div class="tab-content active" id="translate-tab">
+    <div class="language-selection">
+      <div class="lang-group">
+        <label for="translation-lang" class="lang-label">번역 언어</label>
+        <select id="translation-lang" class="lang-select">
+          <option value="ko">한국어</option>
+          <option value="en">영어</option>
+          <option value="ja">일본어</option>
+          <option value="zh">중국어</option>
+        </select>
+      </div>
+
+      <div class="lang-group">
+        <label for="learning-lang" class="lang-label">학습 언어</label>
+        <select id="learning-lang" class="lang-select">
+          <option value="en">영어</option>
+          <option value="ja">일본어</option>
+          <option value="zh">중국어</option>
+          <option value="ko">한국어</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="translation-area">
+      <div class="input-area">
+        <textarea id="input-box" placeholder="번역할 텍스트를 입력하세요..."></textarea>
+      </div>
+      <div class="output-area">
+        <div id="output-box"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="settings-tab">
+    <div class="tooltip-toggle-area">
+      <span>툴팁 번역 활성화</span>
+      <label class="switch">
+        <input type="checkbox" id="tooltip-toggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="settings-area">
+      <div class="setting-section">
+        <div class="section-title-area">
+          <h2>언어 설정</h2>
+          <span class="info-icon">ⓘ</span>
+        </div>
+        <div class="info-tooltip">
+          <span class="info-tooltip-close">&times;</span>
+          <p><strong>번역 언어:</strong> 텍스트가 번역될 기본 언어입니다.</p>
+          <p><strong>학습 언어:</strong> 번역 언어와 원본 언어가 같을 때 대신 번역될 언어입니다. (예: 한국어 텍스트를 선택했고 번역 언어가 한국어라면, 학습 언어인 영어로 번역됨)
+          </p>
+        </div>
+        <div class="setting-item">
+          <span>기본 언어</span>
+          <select id="default-language" class="setting-select">
+            <option value="ko">한국어</option>
+            <option value="en">영어</option>
+            <option value="ja">일본어</option>
+            <option value="zh">중국어</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <span>학습 언어</span>
+          <select id="learning-language" class="setting-select">
+            <option value="en">영어</option>
+            <option value="ja">일본어</option>
+            <option value="zh">중국어</option>
+            <option value="ko">한국어</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-section">
+        <h2>사이트 제외 설정</h2>
+        <div class="site-exclusion-area">
+          <div class="add-site-row">
+            <input type="text" id="new-site-input" placeholder="https://example.com*" class="setting-input site-input">
+            <button id="add-site-btn" class="add-btn">+</button>
+          </div>
+          <div class="disabled-sites-list" id="disabled-sites-list">
+          </div>
+          <p class="setting-desc">위 목록에 있는 사이트에서는 툴팁이 표시되지 않습니다.</p>
+        </div>
+      </div>
+
+      <div class="setting-section">
+        <h2>API 설정</h2>
+        <div class="setting-item">
+          <span>API 공급자</span>
+          <select id="api-provider" class="setting-select">
+            <option value="openai">OpenAI</option>
+            <option value="ollama">Ollama</option>
+            <option value="lmstudio">LM Studio</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <span>API URL</span>
+          <input type="text" id="api-url" class="setting-input" placeholder="https://api.openai.com/v1/">
+        </div>
+        <div class="setting-item">
+          <span>API Key</span>
+          <input type="password" id="api-key" class="setting-input" placeholder="sk-...">
+        </div>
+        <div class="setting-item">
+          <span>모델</span>
+          <input type="text" id="api-model" class="setting-input" placeholder="gpt-4">
+        </div>
+      </div>
+
+      <button id="save-settings" class="save-button">설정 저장</button>
+    </div>
+  </div>
+  <footer>
+    <p class="shortcut">Ctrl + B</p>
+  </footer>
+
+  <script src="../js/api.js" type="module"></script>
+  <script src="../js/sidepanel.js" type="module"></script>
+</body>
+
+</html>

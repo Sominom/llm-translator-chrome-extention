@@ -1,0 +1,21 @@
+{
+  "name": "llm-translator-chrome-extention",
+  "version": "1.0",
+  "description": "LLM을 이용한 간단한 크롬 사이드패널 번역 및 툴팁 번역기",
+  "private": true,
+  "scripts": {
+    "build": "webpack --config config/webpack.config.js",
+    "icon": "node scripts/resize_icon.js"
+  },
+  "devDependencies": {
+    "copy-webpack-plugin": "^10.2.4",
+    "css-loader": "^6.11.0",
+    "mini-css-extract-plugin": "^2.9.4",
+    "sharp": "^0.34.5",
+    "terser-webpack-plugin": "^5.3.16",
+    "webpack": "^5.103.0",
+    "webpack-bundle-analyzer": "^4.10.2",
+    "webpack-cli": "^4.10.0",
+    "webpack-merge": "^5.10.0"
+  }
+}

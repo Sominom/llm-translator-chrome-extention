@@ -1,0 +1,119 @@
+@font-face {
+    font-family: 'Paperlogy-8ExtraBold';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-8ExtraBold.woff2') format('woff2');
+    font-weight: 800;
+    font-style: normal;
+  }
+
+  @font-face {
+    font-family: 'Paperlogy-4Regular';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-4Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  body {
+    font-family: 'Paperlogy-4Regular', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f9f9f9;
+    color: #333;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  h1 {
+    font-family: 'Paperlogy-8ExtraBold';
+    font-size: 2.5rem;
+    color: #2c3e50;
+    margin-bottom: 10px;
+  }
+
+  h2 {
+    font-family: 'Paperlogy-8ExtraBold';
+    font-size: 1.8rem;
+    color: #3498db;
+    margin-top: 40px;
+    margin-bottom: 20px;
+  }
+
+  p {
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+  }
+
+  .feature-box {
+    background-color: white;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .feature-title {
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: #2980b9;
+    margin-bottom: 10px;
+  }
+
+  .button {
+    display: inline-block;
+    background-color: #4285f4;
+    color: white;
+    padding: 12px 30px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    margin-top: 20px;
+    transition: all 0.3s ease;
+  }
+
+  .button:hover {
+    background-color: #3367d6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .usage-step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  .step-number {
+    background-color: #4285f4;
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-right: 15px;
+    flex-shrink: 0;
+  }
+
+  .keyboard-shortcut {
+    background-color: #f0f0f0;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    margin: 0 3px;
+  }
+
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    color: #7f8c8d;
+  }
