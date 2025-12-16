@@ -9,7 +9,8 @@
     "storage"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "http://*",
+    "https://*"
   ],
   "side_panel": {
     "default_path": "template/sidepanel.html"
