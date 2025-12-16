@@ -6,13 +6,7 @@
   "permissions": [
     "sidePanel",
     "tabs",
-    "activeTab",
-    "storage",
-    "contextMenus",
-    "scripting",
-    "notifications",
-    "webNavigation",
-    "declarativeContent"
+    "storage"
   ],
   "host_permissions": [
     "https://api.openai.com/*",
