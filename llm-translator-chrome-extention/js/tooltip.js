@@ -101,7 +101,7 @@ function initTooltip() {
 
 // 메뉴 토글
 function toggleMenu(e) {
-  e.stopPropagation();
+  if (e) e.stopPropagation();
   if (tooltipMenuDropdown.style.display === "block") {
     tooltipMenuDropdown.style.display = "none";
   } else {
@@ -117,7 +117,7 @@ async function disableOnThisSite(e) {
   const pattern = window.location.origin + "/*";
   
   // 메뉴 닫기
-  toggleMenu();
+  toggleMenu(e);
 
   try {
     // 백그라운드에 사이트 추가 요청
@@ -135,8 +135,8 @@ async function disableOnThisSite(e) {
         if (response.alreadyExists) {
           alert(`'${pattern}'은(는) 이미 비활성화된 패턴입니다.`);
         } else {
-          alert(`'${pattern}' 패턴으로 번역 툴팁이 비활성화되었습니다.\n설정 패널에서 관리할 수 있습니다.`);
-          // 로컬 상태 업데이트 (응답받은 설정으로)
+          alert(`'${pattern}' 사이트의 번역 툴팁이 비활성화되었습니다.\n설정 패널에서 관리할 수 있습니다.`);
+          // 응답받은 설정으로 로컬 상태 업데이트
           if (response.settings && response.settings.disabledSites) {
             disabledSites = response.settings.disabledSites;
           }
@@ -190,7 +190,10 @@ function setupTextSelection() {
     const currentUrl = window.location.href;
     const isDisabled = disabledSites.some(pattern => isUrlMatched(currentUrl, pattern));
     
-    if (isDisabled) return;
+    if (isDisabled) {
+      hideTooltip();
+      return;
+    }
 
     if (selectedText && selectedText.length > 0 && selectedText.length < 1000) {
       if (selectedText === lastSelectionText) return;
@@ -254,6 +257,7 @@ async function showTooltip(event, text) {
 function hideTooltip() {
   if (tooltipContainer) {
     tooltipContainer.style.display = "none";
+    tooltipMenuDropdown.style.display = "none";
   }
   isTranslating = false;
 }

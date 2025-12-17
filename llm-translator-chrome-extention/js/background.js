@@ -262,7 +262,8 @@ async function getSettings() {
       'apiUrl',
       'apiKey',
       'apiModel',
-      'isTooltipEnabled'
+      'isTooltipEnabled',
+      'disabledSites'
     ], (result) => {
       if (chrome.runtime.lastError) {
         console.error("설정 가져오기 오류:", chrome.runtime.lastError);
