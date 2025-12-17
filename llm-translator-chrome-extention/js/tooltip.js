@@ -18,6 +18,8 @@ let tooltipMenuDropdown;
 let isTranslating = false;
 let lastSelectionText = "";
 let disabledSites = [];
+let lastSelectionRange = null;
+let repositionScheduled = false;
 
 function globToRegex(pattern) {
   // * 제외 특수 문자 이스케이프
@@ -185,6 +187,7 @@ function setupTextSelection() {
     if (!isTooltipEnabled || isTranslating) return;
 
     const selectedText = window.getSelection().toString().trim();
+    const selection = window.getSelection();
     
     // 비활성화된 사이트인지 확인
     const currentUrl = window.location.href;
@@ -198,6 +201,11 @@ function setupTextSelection() {
     if (selectedText && selectedText.length > 0 && selectedText.length < 1000) {
       if (selectedText === lastSelectionText) return;
       lastSelectionText = selectedText;
+      if (selection && selection.rangeCount > 0) {
+        lastSelectionRange = selection.getRangeAt(0).cloneRange();
+      } else {
+        lastSelectionRange = null;
+      }
 
       try {
         await showTooltip(event, selectedText);
@@ -217,27 +225,22 @@ async function showTooltip(event, text) {
   isTranslating = true;
   tooltipText.textContent = "번역 중...";
   tooltipContainer.style.display = "block";
-  
-  // 툴팁 위치 설정
-  const x = event.pageX;
-  const y = event.pageY;
-  tooltipContainer.style.left = x + 10 + "px";
-  tooltipContainer.style.top = y - 40 + "px";
-  
-  adjustTooltipPosition(event);
+
+  // 초기 위치(선택 영역 기준) 설정
+  scheduleTooltipReposition();
 
   try {
     await window.translationAPI.translateWithStream(text, {
       onStreamUpdate: (chunk, accumulated, data) => {
         if (data.type === 'chunk') {
           tooltipText.textContent = accumulated;
-          adjustTooltipPosition(event);
+          scheduleTooltipReposition();
         }
       },
       onComplete: (finalText) => {
         console.log("툴팁 번역 완료:", finalText);
         tooltipText.textContent = finalText;
-        adjustTooltipPosition(event);
+        scheduleTooltipReposition();
       },
       onError: (error) => {
         console.error("툴팁 번역 오류:", error);
@@ -260,35 +263,70 @@ function hideTooltip() {
     tooltipMenuDropdown.style.display = "none";
   }
   isTranslating = false;
+  lastSelectionRange = null;
 }
 
-function adjustTooltipPosition(event) {
-  if (!tooltipContainer) return;
+function getSelectionAnchorClientRect() {
+  // 마지막 선택 범위가 있으면 우선 사용 (스크롤/레이아웃 변화에도 따라감)
+  const range = lastSelectionRange;
+  if (!range) return null;
 
-  const rect = tooltipContainer.getBoundingClientRect();
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  
-  let x = event.pageX + 10;
-  let y = event.pageY - 40;
-  
-  // 오른쪽 경계 확인
-  if (x + rect.width > viewportWidth) {
-    x = event.pageX - rect.width - 10;
+  const clientRects = range.getClientRects();
+  const rect = clientRects && clientRects.length > 0 ? clientRects[0] : range.getBoundingClientRect();
+  if (!rect) return null;
+
+  // rect가 비어있는 경우 방어
+  if (rect.width === 0 && rect.height === 0) return null;
+  return rect;
+}
+
+function repositionTooltip() {
+  if (!tooltipContainer) return;
+  if (tooltipContainer.style.display !== "block") return;
+
+  const anchorRect = getSelectionAnchorClientRect();
+  if (!anchorRect) return;
+
+  // 툴팁 크기(뷰포트 기준)
+  const tooltipRect = tooltipContainer.getBoundingClientRect();
+
+  // 기준 좌표는 "페이지 좌표"로 통일 (absolute 포지션)
+  const viewportLeft = window.scrollX;
+  const viewportTop = window.scrollY;
+  const viewportRight = viewportLeft + window.innerWidth;
+  const viewportBottom = viewportTop + window.innerHeight;
+
+  // 기본: 선택 영역 우측 상단 기준으로 위쪽에 띄움
+  let x = anchorRect.right + window.scrollX + 10;
+  let y = anchorRect.top + window.scrollY - tooltipRect.height - 10;
+
+  // 좌우 경계 보정
+  if (x + tooltipRect.width > viewportRight) {
+    x = anchorRect.left + window.scrollX - tooltipRect.width - 10;
   }
-  
-  // 위쪽 경계 확인
-  if (y < 0) {
-    y = event.pageY + 20;
+  if (x < viewportLeft + 10) {
+    x = viewportLeft + 10;
   }
-  
-  // 아래쪽 경계 확인
-  if (y + rect.height > viewportHeight) {
-    y = event.pageY - rect.height - 10;
+
+  // 상하 경계 보정
+  if (y < viewportTop + 10) {
+    y = anchorRect.bottom + window.scrollY + 10;
   }
-  
-  tooltipContainer.style.left = x + "px";
-  tooltipContainer.style.top = y + "px";
+  if (y + tooltipRect.height > viewportBottom - 10) {
+    y = viewportBottom - tooltipRect.height - 10;
+  }
+
+  tooltipContainer.style.left = `${x}px`;
+  tooltipContainer.style.top = `${y}px`;
+}
+
+function scheduleTooltipReposition() {
+  if (repositionScheduled) return;
+  repositionScheduled = true;
+  requestAnimationFrame(() => {
+    repositionScheduled = false;
+    repositionTooltip();
+  });
 }
 
 document.addEventListener("mousedown", (event) => {
@@ -299,7 +337,23 @@ document.addEventListener("mousedown", (event) => {
   }
 });
 
-document.addEventListener("scroll", hideTooltip);
+// 스크롤 시 툴팁을 숨기지 않고, 선택 영역 기준으로 위치를 갱신
+// capture: true 로 설정해 overflow 컨테이너 스크롤도 잡음
+document.addEventListener(
+  "scroll",
+  () => {
+    if (!tooltipContainer) return;
+    if (tooltipContainer.style.display !== "block") return;
+    scheduleTooltipReposition();
+  },
+  { capture: true, passive: true }
+);
+
+window.addEventListener("resize", () => {
+  if (!tooltipContainer) return;
+  if (tooltipContainer.style.display !== "block") return;
+  scheduleTooltipReposition();
+});
 
 // ESC 키로 툴팁 숨김
 document.addEventListener("keydown", (event) => {
