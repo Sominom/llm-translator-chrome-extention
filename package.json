@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build": "webpack --config config/webpack.config.js",
+    "build:dev": "export ANALYZE=1 && webpack --config config/webpack.config.js",
     "icon": "node scripts/resize_icon.js"
   },
   "devDependencies": {
