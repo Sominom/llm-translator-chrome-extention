@@ -373,7 +373,8 @@ async function getSettings() {
       'apiUrl',
       'apiKey',
       'apiModel',
-      'isTooltipEnabled'
+      'isTooltipEnabled',
+      'disabledSites'
     ], (result) => {
       if (chrome.runtime.lastError) {
         console.error("설정 가져오기 오류:", chrome.runtime.lastError);
@@ -421,27 +422,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") {
     console.log("신규 설치: 웰컴 페이지 열기");
     chrome.tabs.create({ url: welcomePage });
-  }
-
-  try {
-    // 사이드 패널 설정
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-    console.log("사이드 패널 행동 설정 완료");
-
-    // declarativeContent API 설정 - 모든 웹 페이지에서 활성화
-    chrome.declarativeContent.onPageChanged.removeRules(undefined, () => {
-      chrome.declarativeContent.onPageChanged.addRules([{
-        conditions: [
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { schemes: ['http', 'https'] },
-          })
-        ],
-        actions: [new chrome.declarativeContent.ShowAction()]
-      }]);
-    });
-
-  } catch (error) {
-    console.error("사이드 패널 행동 설정 오류:", error);
   }
 });
 

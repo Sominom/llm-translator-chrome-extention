@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LLM Translator",
-  "version": "1.4",
+  "version": "1.5",
   "description": "LLM을 이용한 간단한 크롬 사이드패널 번역 및 툴팁 번역기",
   "permissions": [
     "sidePanel",
@@ -44,7 +44,7 @@
       "48": "assets/icon/icon48.png",
       "128": "assets/icon/icon128.png"
     },
-    "default_title": "Quick Translator - 사이드패널 열기"
+    "default_title": "LLM Translator"
   },
   "background": {
     "service_worker": "js/background.js",
@@ -57,7 +57,7 @@
         "js/tooltip.js"
       ],
       "matches": [
-        "<all_urls>"
+        "https://*/*"
       ],
       "css": [],
       "run_at": "document_end",
@@ -76,7 +76,7 @@
         "js/*"
       ],
       "matches": [
-        "<all_urls>"
+        "https://*/*"
       ]
     }
   ]
