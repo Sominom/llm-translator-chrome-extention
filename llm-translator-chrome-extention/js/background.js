@@ -81,6 +81,117 @@ async function detectLanguage(text, settings) {
 }
 
 /**
+// 스트리밍 채팅 API 호출 함수
+async function callLLMChatStream(messages, settings, sender, requestId) {
+  try {
+    // API 키 확인
+    if (!settings.apiKey && settings.apiProvider === 'openai') {
+      throw new Error("API 키를 설정해주세요.");
+    }
+
+    const sendResponse = (message) => {
+      if (sender.tab?.id) {
+        chrome.tabs.sendMessage(sender.tab.id, message);
+      } else {
+        chrome.runtime.sendMessage(message);
+      }
+    };
+
+    let apiUrl = settings.apiUrl;
+    if (!apiUrl.endsWith('/')) apiUrl += '/';
+    const fetchUrl = apiUrl + 'chat/completions';
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${settings.apiKey}`
+    };
+
+    const response = await fetch(fetchUrl, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        model: settings.apiModel || 'gpt-4',
+        messages: messages,
+        temperature: 0.7,
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        sendResponse({
+          action: "chatStream",
+          requestId: requestId,
+          type: "complete"
+        });
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') {
+            sendResponse({
+              action: "chatStream",
+              requestId: requestId,
+              type: "complete"
+            });
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+
+            if (content) {
+              sendResponse({
+                action: "chatStream",
+                requestId: requestId,
+                type: "chunk",
+                content: content
+              });
+            }
+          } catch (parseError) {
+            console.warn("JSON 파싱 오류:", parseError);
+          }
+        }
+      }
+    }
+
+  } catch (error) {
+    console.error("채팅 오류:", error);
+    const sendResponse = (message) => {
+      if (sender.tab?.id) {
+        chrome.tabs.sendMessage(sender.tab.id, message);
+      } else {
+        chrome.runtime.sendMessage(message);
+      }
+    };
+
+    sendResponse({
+      action: "chatStream",
+      requestId: requestId,
+      type: "error",
+      error: error.message || "통신 오류가 발생했습니다."
+    });
+  }
+}
+
+/**
  * 스트리밍 번역 API 호출 함수
  * @param {string} selectedText - 번역할 텍스트
  * @param {Object} settings - API 설정
@@ -383,6 +494,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true; // 비동기 응답을 위해 true 반환
+  }
+
+  // 스트리밍 채팅 요청 처리
+  if (request.action === "chatStream") {
+    (async () => {
+      try {
+        const settings = await getSettings();
+        await callLLMChatStream(request.messages, settings, sender, request.requestId);
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error("스트리밍 채팅 오류:", error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
   }
 
   // 번역 취소 요청 처리

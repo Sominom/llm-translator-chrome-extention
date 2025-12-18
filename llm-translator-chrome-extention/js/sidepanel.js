@@ -16,11 +16,113 @@ document.addEventListener("DOMContentLoaded", () => {
     isTooltipEnabled: document.querySelector("#tooltip-toggle"),
     disabledSitesList: document.querySelector("#disabled-sites-list"),
     newSiteInput: document.querySelector("#new-site-input"),
-    addSiteBtn: document.querySelector("#add-site-btn")
+    addSiteBtn: document.querySelector("#add-site-btn"),
+    chatInput: document.querySelector("#chat-input"),
+    chatHistory: document.querySelector("#chat-history"),
+    sendChatBtn: document.querySelector("#send-chat-btn"),
+    clearChatBtn: document.querySelector("#clear-chat-btn")
   };
 
   let isTranslating = false;
+  let isChatting = false;
   let currentRequestId = null;
+  let chatMessages = []; // 채팅 내역 저장
+
+  // 채팅 메시지 렌더링
+  function renderMessage(role, content) {
+    if (!elements.chatHistory) return;
+
+    const messageDiv = document.createElement("div");
+    messageDiv.className = `chat-message ${role}`;
+
+    // 마크다운 처리 등은 추후 추가 가능. 현재는 텍스트 그대로 출력
+    messageDiv.textContent = content;
+
+    elements.chatHistory.appendChild(messageDiv);
+    elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
+
+    return messageDiv; // 스트리밍 업데이트를 위해 반환
+  }
+
+  // 채팅 내역 저장
+  function saveChatHistory() {
+    chrome.storage.local.set({ chatHistory: chatMessages });
+  }
+
+  // 채팅 내역 불러오기
+  function loadChatHistory() {
+    chrome.storage.local.get(['chatHistory'], (result) => {
+      if (result.chatHistory) {
+        chatMessages = result.chatHistory;
+        if (elements.chatHistory) {
+          elements.chatHistory.innerHTML = '';
+          chatMessages.forEach(msg => renderMessage(msg.role, msg.content));
+        }
+      }
+    });
+  }
+
+  // 채팅 전송 처리
+  async function handleChatSend() {
+    const text = elements.chatInput?.value?.trim();
+    if (!text || isChatting) return;
+
+    elements.chatInput.value = '';
+    isChatting = true;
+
+    // 사용자 메시지 추가
+    chatMessages.push({ role: 'user', content: text });
+    renderMessage('user', text);
+    saveChatHistory();
+
+    // 어시스턴트 메시지 요소 생성 (스트리밍용)
+    const assistantMessageDiv = renderMessage('assistant', '...');
+    let assistantText = '';
+
+    try {
+      await waitForAPI();
+
+      await window.translationAPI.chatWithStream(chatMessages, {
+        onStreamUpdate: (chunk, accumulated, data) => {
+          if (data.type === 'chunk' && assistantMessageDiv) {
+            assistantText = accumulated;
+            assistantMessageDiv.textContent = assistantText;
+            elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
+          }
+        },
+        onComplete: (finalText) => {
+          console.log("채팅 완료:", finalText);
+          assistantText = finalText;
+          assistantMessageDiv.textContent = assistantText;
+
+          // 대화 내역에 추가
+          chatMessages.push({ role: 'assistant', content: assistantText });
+          saveChatHistory();
+          isChatting = false;
+        },
+        onError: (error) => {
+          console.error("채팅 오류:", error);
+          assistantMessageDiv.textContent = "오류가 발생했습니다: " + error.message;
+          chatMessages.push({ role: 'assistant', content: "오류가 발생했습니다: " + error.message });
+          saveChatHistory();
+          isChatting = false;
+        }
+      });
+    } catch (error) {
+      console.error("채팅 시작 오류:", error);
+      assistantMessageDiv.textContent = "오류가 발생했습니다.";
+      isChatting = false;
+    }
+  }
+
+  // 채팅 기록 삭제
+  function clearChatHistory() {
+    chatMessages = [];
+    if (elements.chatHistory) {
+      elements.chatHistory.innerHTML = '';
+    }
+    chrome.storage.local.remove(['chatHistory']);
+  }
 
   async function translateText(text, translationLang, learningLang) {
     if (!text.trim()) {
@@ -326,6 +428,24 @@ document.addEventListener("DOMContentLoaded", () => {
         switchTab(tabName);
       });
     });
+
+    // 채팅 관련 이벤트
+    if (elements.sendChatBtn) {
+      elements.sendChatBtn.addEventListener("click", handleChatSend);
+    }
+
+    if (elements.clearChatBtn) {
+      elements.clearChatBtn.addEventListener("click", clearChatHistory);
+    }
+
+    if (elements.chatInput) {
+      elements.chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          handleChatSend();
+        }
+      });
+    }
     
     // API 공급자 변경 이벤트
     if (elements.apiProvider) {
@@ -426,6 +546,9 @@ document.addEventListener("DOMContentLoaded", () => {
       
       // 설정 로드
       await loadSettings();
+
+      // 채팅 내역 로드
+      loadChatHistory();
       
       // 입력창에 포커스
       if (elements.inputBox) {

@@ -12,6 +12,7 @@
     <h1>Quick Translator</h1>
     <div class="tab-container">
       <button class="tab-button active" data-tab="translate">번역</button>
+      <button class="tab-button" data-tab="chat">채팅</button>
       <button class="tab-button" data-tab="settings">설정</button>
     </div>
   </div>
@@ -45,6 +46,21 @@
       </div>
       <div class="output-area">
         <div id="output-box"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="chat-tab">
+    <div class="chat-container">
+      <div id="chat-history" class="chat-history">
+        <!-- Messages will be appended here -->
+      </div>
+      <div class="chat-input-area">
+        <textarea id="chat-input" placeholder="메시지를 입력하세요..."></textarea>
+        <div class="chat-actions">
+          <button id="clear-chat-btn" class="secondary-button">기록 삭제</button>
+          <button id="send-chat-btn" class="primary-button">전송</button>
+        </div>
       </div>
     </div>
   </div>
