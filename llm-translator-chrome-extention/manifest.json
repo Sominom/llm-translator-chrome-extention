@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LLM Translator",
-  "version": "1.5",
+  "version": "1.6",
   "description": "LLM을 이용한 간단한 크롬 사이드패널 번역 및 툴팁 번역기",
   "permissions": [
     "sidePanel",
