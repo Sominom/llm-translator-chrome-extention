@@ -158,7 +158,7 @@ async function callTranslationAPIStream(selectedText, settings, sender, requestI
       method: 'POST',
       headers: headers,
       body: JSON.stringify({
-        model: settings.apiModel || 'gpt-4',
+        model: settings.apiModel || 'gpt-4.1-nano',
         messages: messages,
         temperature: 0.8,
         max_tokens: 2000,
@@ -290,7 +290,7 @@ async function callChatAPIStream(messages, settings, sender, requestId) {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: settings.apiModel || 'gpt-4',
+        model: settings.apiModel || 'gpt-4.1-nano',
         messages: Array.isArray(messages) ? messages : [],
         temperature: 0.8,
         max_tokens: 2000,
