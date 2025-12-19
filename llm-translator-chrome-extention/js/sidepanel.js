@@ -16,11 +16,33 @@ document.addEventListener("DOMContentLoaded", () => {
     isTooltipEnabled: document.querySelector("#tooltip-toggle"),
     disabledSitesList: document.querySelector("#disabled-sites-list"),
     newSiteInput: document.querySelector("#new-site-input"),
-    addSiteBtn: document.querySelector("#add-site-btn")
+    addSiteBtn: document.querySelector("#add-site-btn"),
+
+    // Chat UI
+    chatNewBtn: document.querySelector("#chat-new-btn"),
+    chatMenuBtn: document.querySelector("#chat-menu-btn"),
+    chatDrawerOverlay: document.querySelector("#chat-drawer-overlay"),
+    chatDrawerClose: document.querySelector("#chat-drawer-close"),
+    chatConversationList: document.querySelector("#chat-conversation-list"),
+    chatMessages: document.querySelector("#chat-messages"),
+    chatInput: document.querySelector("#chat-input"),
+    chatSendBtn: document.querySelector("#chat-send-btn")
   };
 
   let isTranslating = false;
   let currentRequestId = null;
+
+  // Chat state
+  const CHAT_STORAGE_KEY_CONVERSATIONS = "chatConversations";
+  const CHAT_STORAGE_KEY_ACTIVE_ID = "activeChatConversationId";
+  const CHAT_MAX_CONVERSATIONS = 50;
+  const CHAT_MAX_MESSAGES_PER_CONVO = 200;
+
+  let chatConversations = [];
+  let activeChatConversationId = null;
+  let isChatStreaming = false;
+  let currentChatRequestId = null;
+  let chatPersistTimer = null;
 
   async function translateText(text, translationLang, learningLang) {
     if (!text.trim()) {
@@ -148,6 +170,396 @@ document.addEventListener("DOMContentLoaded", () => {
     if (selectedTabContent) {
       selectedTabContent.classList.add("active");
     }
+
+    if (tabName === "chat" && elements.chatInput) {
+      // 탭 전환 직후 포커싱(렌더/레이아웃 안정화)
+      setTimeout(() => elements.chatInput?.focus(), 0);
+    }
+  }
+
+  function nowTs() {
+    return Date.now();
+  }
+
+  function formatRelativeTime(ts) {
+    if (!ts) return "";
+    const diff = Math.max(0, Date.now() - ts);
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "방금";
+    if (mins < 60) return `${mins}분 전`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}시간 전`;
+    const days = Math.floor(hours / 24);
+    return `${days}일 전`;
+  }
+
+  function createId(prefix) {
+    return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+
+  function deriveConversationTitle(convo) {
+    const firstUser = convo?.messages?.find((m) => m.role === "user" && (m.content || "").trim());
+    const raw = (firstUser?.content || "새 채팅").trim().replace(/\s+/g, " ");
+    return raw.length > 24 ? `${raw.slice(0, 24)}…` : raw;
+  }
+
+  async function loadChatState() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get([CHAT_STORAGE_KEY_CONVERSATIONS, CHAT_STORAGE_KEY_ACTIVE_ID], (result) => {
+        const conversations = Array.isArray(result[CHAT_STORAGE_KEY_CONVERSATIONS])
+          ? result[CHAT_STORAGE_KEY_CONVERSATIONS]
+          : [];
+        const activeId = typeof result[CHAT_STORAGE_KEY_ACTIVE_ID] === "string" ? result[CHAT_STORAGE_KEY_ACTIVE_ID] : null;
+        resolve({ conversations, activeId });
+      });
+    });
+  }
+
+  async function saveChatState() {
+    // 과도한 저장 방지: 디바운스 저장
+    if (chatPersistTimer) {
+      clearTimeout(chatPersistTimer);
+    }
+    chatPersistTimer = setTimeout(() => {
+      const trimmedConversations = [...chatConversations]
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+        .slice(0, CHAT_MAX_CONVERSATIONS)
+        .map((c) => ({
+          ...c,
+          messages: Array.isArray(c.messages) ? c.messages.slice(-CHAT_MAX_MESSAGES_PER_CONVO) : []
+        }));
+
+      chrome.storage.local.set(
+        {
+          [CHAT_STORAGE_KEY_CONVERSATIONS]: trimmedConversations,
+          [CHAT_STORAGE_KEY_ACTIVE_ID]: activeChatConversationId
+        },
+        () => {
+          // noop
+        }
+      );
+    }, 300);
+  }
+
+  function getActiveConversation() {
+    if (!activeChatConversationId) return null;
+    return chatConversations.find((c) => c.id === activeChatConversationId) || null;
+  }
+
+  function ensureActiveConversation() {
+    let convo = getActiveConversation();
+    if (convo) return convo;
+
+    if (chatConversations.length > 0) {
+      // 최신 대화로 복구
+      chatConversations.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      activeChatConversationId = chatConversations[0].id;
+      return chatConversations[0];
+    }
+
+    const newConvo = {
+      id: createId("convo"),
+      title: "새 채팅",
+      createdAt: nowTs(),
+      updatedAt: nowTs(),
+      messages: []
+    };
+    chatConversations.unshift(newConvo);
+    activeChatConversationId = newConvo.id;
+    saveChatState();
+    return newConvo;
+  }
+
+  function openChatDrawer() {
+    if (!elements.chatDrawerOverlay) return;
+    elements.chatDrawerOverlay.classList.add("open");
+    elements.chatDrawerOverlay.setAttribute("aria-hidden", "false");
+  }
+
+  function closeChatDrawer() {
+    if (!elements.chatDrawerOverlay) return;
+    elements.chatDrawerOverlay.classList.remove("open");
+    elements.chatDrawerOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function renderConversationList() {
+    if (!elements.chatConversationList) return;
+
+    elements.chatConversationList.innerHTML = "";
+
+    const items = [...chatConversations].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (items.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.color = "#999";
+      empty.style.padding = "8px";
+      empty.textContent = "대화가 없습니다. 새 채팅을 시작해보세요.";
+      elements.chatConversationList.appendChild(empty);
+      return;
+    }
+
+    items.forEach((convo) => {
+      const row = document.createElement("div");
+      row.className = `chat-conversation-item${convo.id === activeChatConversationId ? " active" : ""}`;
+      row.setAttribute("data-conversation-id", convo.id);
+
+      const text = document.createElement("div");
+      text.className = "chat-conversation-text";
+
+      const title = document.createElement("div");
+      title.className = "chat-conversation-title";
+      title.textContent = convo.title || "새 채팅";
+
+      const subtitle = document.createElement("div");
+      subtitle.className = "chat-conversation-subtitle";
+      subtitle.textContent = `${formatRelativeTime(convo.updatedAt)} · ${convo.messages?.length || 0}개 메시지`;
+
+      text.appendChild(title);
+      text.appendChild(subtitle);
+
+      const actions = document.createElement("div");
+      actions.className = "chat-conversation-actions";
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "chat-delete-btn";
+      delBtn.type = "button";
+      delBtn.title = "삭제";
+      delBtn.textContent = "×";
+
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteConversation(convo.id);
+      });
+
+      actions.appendChild(delBtn);
+
+      row.appendChild(text);
+      row.appendChild(actions);
+
+      row.addEventListener("click", () => {
+        selectConversation(convo.id);
+        closeChatDrawer();
+      });
+
+      elements.chatConversationList.appendChild(row);
+    });
+  }
+
+  function createChatMessageElement(msg) {
+    const wrapper = document.createElement("div");
+    wrapper.className = `chat-message ${msg.role === "user" ? "user" : "assistant"}`;
+    wrapper.setAttribute("data-message-id", msg.id);
+
+    const bubble = document.createElement("div");
+    bubble.className = "chat-bubble";
+    bubble.textContent = msg.content || "";
+
+    const meta = document.createElement("div");
+    meta.className = "chat-meta";
+    meta.textContent = msg.role === "user" ? "나" : "AI";
+
+    wrapper.appendChild(bubble);
+    wrapper.appendChild(meta);
+    return wrapper;
+  }
+
+  function renderChatMessages() {
+    if (!elements.chatMessages) return;
+    const convo = ensureActiveConversation();
+
+    elements.chatMessages.innerHTML = "";
+
+    if (!convo.messages || convo.messages.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.color = "#999";
+      empty.style.padding = "6px";
+      empty.textContent = "새 채팅을 시작해보세요.";
+      elements.chatMessages.appendChild(empty);
+      return;
+    }
+
+    convo.messages.forEach((msg) => {
+      if (msg.role !== "user" && msg.role !== "assistant") return;
+      elements.chatMessages.appendChild(createChatMessageElement(msg));
+    });
+
+    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  }
+
+  function appendMessageToConversation(convoId, message) {
+    const convo = chatConversations.find((c) => c.id === convoId);
+    if (!convo) return;
+    convo.messages = Array.isArray(convo.messages) ? convo.messages : [];
+    convo.messages.push(message);
+    convo.updatedAt = nowTs();
+    if (!convo.title || convo.title === "새 채팅") {
+      convo.title = deriveConversationTitle(convo);
+    }
+    saveChatState();
+  }
+
+  function updateAssistantMessage(convoId, messageId, newText) {
+    const convo = chatConversations.find((c) => c.id === convoId);
+    if (!convo) return;
+    const msg = convo.messages?.find((m) => m.id === messageId);
+    if (msg) {
+      msg.content = newText;
+      convo.updatedAt = nowTs();
+      saveChatState();
+    }
+
+    if (convoId === activeChatConversationId && elements.chatMessages) {
+      const el = elements.chatMessages.querySelector(`[data-message-id="${messageId}"] .chat-bubble`);
+      if (el) {
+        el.textContent = newText;
+        elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+      }
+    }
+  }
+
+  function selectConversation(convoId) {
+    const exists = chatConversations.some((c) => c.id === convoId);
+    if (!exists) return;
+    activeChatConversationId = convoId;
+    saveChatState();
+    renderConversationList();
+    renderChatMessages();
+  }
+
+  function createNewConversation() {
+    if (isChatStreaming) {
+      alert("응답 생성 중에는 새 채팅을 만들 수 없습니다.");
+      return;
+    }
+
+    const convo = {
+      id: createId("convo"),
+      title: "새 채팅",
+      createdAt: nowTs(),
+      updatedAt: nowTs(),
+      messages: []
+    };
+    chatConversations.unshift(convo);
+    activeChatConversationId = convo.id;
+    saveChatState();
+    renderConversationList();
+    renderChatMessages();
+    closeChatDrawer();
+    elements.chatInput?.focus();
+  }
+
+  function deleteConversation(convoId) {
+    const convo = chatConversations.find((c) => c.id === convoId);
+    if (!convo) return;
+
+    if (isChatStreaming && convoId === activeChatConversationId) {
+      alert("응답 생성 중인 대화는 삭제할 수 없습니다.");
+      return;
+    }
+
+    const ok = confirm(`이 대화를 삭제할까요?\n\n"${convo.title || "새 채팅"}"`);
+    if (!ok) return;
+
+    chatConversations = chatConversations.filter((c) => c.id !== convoId);
+
+    if (activeChatConversationId === convoId) {
+      activeChatConversationId = chatConversations.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0]?.id || null;
+      if (!activeChatConversationId) {
+        // 모두 삭제된 경우 새 대화 생성
+        const newConvo = {
+          id: createId("convo"),
+          title: "새 채팅",
+          createdAt: nowTs(),
+          updatedAt: nowTs(),
+          messages: []
+        };
+        chatConversations.unshift(newConvo);
+        activeChatConversationId = newConvo.id;
+      }
+    }
+
+    saveChatState();
+    renderConversationList();
+    renderChatMessages();
+  }
+
+  function buildChatRequestMessages(convo) {
+    const baseSystem = {
+      role: "system",
+      content: "당신은 도움이 되는 AI 어시스턴트입니다. 사용자의 질문에 정확하고 간결하게 답변하세요."
+    };
+    const history = (convo?.messages || [])
+      .filter((m) => (m.role === "user" || m.role === "assistant") && (m.content || "").trim())
+      .map((m) => ({ role: m.role, content: m.content }));
+    return [baseSystem, ...history];
+  }
+
+  async function sendChatMessage() {
+    const text = elements.chatInput?.value?.trim();
+    if (!text) return;
+
+    if (isChatStreaming) {
+      console.log("이미 채팅 응답 생성 중입니다.");
+      return;
+    }
+
+    try {
+      await waitForAPI();
+    } catch (e) {
+      alert("API 모듈을 로드할 수 없습니다.");
+      return;
+    }
+
+    const convo = ensureActiveConversation();
+    const convoId = convo.id;
+
+    // 사용자 메시지 추가
+    const userMsg = { id: createId("msg"), role: "user", content: text, ts: nowTs() };
+    appendMessageToConversation(convoId, userMsg);
+    elements.chatInput.value = "";
+    renderChatMessages();
+
+    // 어시스턴트 플레이스홀더
+    const assistantMsgId = createId("msg");
+    const assistantMsg = { id: assistantMsgId, role: "assistant", content: "", ts: nowTs() };
+    appendMessageToConversation(convoId, assistantMsg);
+    renderChatMessages();
+
+    isChatStreaming = true;
+    currentChatRequestId = Date.now().toString();
+    if (elements.chatSendBtn) elements.chatSendBtn.disabled = true;
+
+    const requestMessages = buildChatRequestMessages(chatConversations.find((c) => c.id === convoId));
+
+    try {
+      await window.translationAPI.chatWithStream(requestMessages, {
+        onStreamUpdate: (_chunk, accumulated) => {
+          updateAssistantMessage(convoId, assistantMsgId, accumulated);
+        },
+        onComplete: (finalText) => {
+          updateAssistantMessage(convoId, assistantMsgId, finalText);
+        },
+        onError: (error) => {
+          console.error("채팅 오류:", error);
+          updateAssistantMessage(convoId, assistantMsgId, `오류: ${error.message || "채팅 중 오류가 발생했습니다."}`);
+        }
+      });
+    } finally {
+      isChatStreaming = false;
+      currentChatRequestId = null;
+      if (elements.chatSendBtn) elements.chatSendBtn.disabled = false;
+    }
+  }
+
+  async function initializeChat() {
+    if (!elements.chatMessages) return;
+
+    const { conversations, activeId } = await loadChatState();
+    chatConversations = Array.isArray(conversations) ? conversations : [];
+    activeChatConversationId = activeId;
+
+    ensureActiveConversation();
+    renderConversationList();
+    renderChatMessages();
   }
 
   // 사이트 제외 목록 렌더링
@@ -326,6 +738,72 @@ document.addEventListener("DOMContentLoaded", () => {
         switchTab(tabName);
       });
     });
+
+    // Chat: 새 채팅
+    if (elements.chatNewBtn) {
+      elements.chatNewBtn.addEventListener("click", createNewConversation);
+    }
+
+    // Chat: 메뉴(대화 목록)
+    if (elements.chatMenuBtn) {
+      elements.chatMenuBtn.addEventListener("click", () => {
+        renderConversationList();
+        openChatDrawer();
+      });
+    }
+
+    // Chat: 드로어 닫기
+    if (elements.chatDrawerClose) {
+      elements.chatDrawerClose.addEventListener("click", closeChatDrawer);
+    }
+
+    if (elements.chatDrawerOverlay) {
+      elements.chatDrawerOverlay.addEventListener("click", (e) => {
+        if (e.target === elements.chatDrawerOverlay) {
+          closeChatDrawer();
+        }
+      });
+    }
+
+    // Chat: 전송 버튼
+    if (elements.chatSendBtn) {
+      elements.chatSendBtn.addEventListener("click", sendChatMessage);
+    }
+
+    // Chat: Enter 전송 / Shift+Enter 줄바꿈
+    if (elements.chatInput) {
+      // macOS 한글/일본어 등 IME 조합 입력 시 Enter가 "조합 확정"과 "Enter"로 중복 처리되며
+      // 전송 후 textarea를 비워도 마지막 글자가 다시 남는 문제가 발생할 수 있어, 조합 중에는 전송을 막는다.
+      let isChatComposing = false;
+
+      elements.chatInput.addEventListener("compositionstart", () => {
+        isChatComposing = true;
+      });
+
+      elements.chatInput.addEventListener("compositionend", () => {
+        isChatComposing = false;
+      });
+
+      elements.chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          // IME 조합 중 Enter는 전송이 아니라 "조합 확정"이 우선
+          // - e.isComposing: 표준 플래그(Chrome 지원)
+          // - keyCode 229: 일부 IME에서 조합 키 입력을 나타내는 값(레거시 호환)
+          if (e.isComposing || isChatComposing || e.keyCode === 229) {
+            return;
+          }
+          e.preventDefault();
+          sendChatMessage();
+        }
+      });
+    }
+
+    // ESC로 드로어 닫기
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeChatDrawer();
+      }
+    });
     
     // API 공급자 변경 이벤트
     if (elements.apiProvider) {
@@ -405,7 +883,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function isMacAndChangeShortcut() {
     const isMac = navigator.userAgent.includes("Mac");
     const shortcut = isMac ? "Command + B" : "Ctrl + B";
-    document.querySelector(".shortcut").textContent = shortcut;
+    const shortcutElement = document.querySelector(".shortcut");
+    if (shortcutElement) {
+      shortcutElement.textContent = shortcut;
+    }
     return;
   }
 
@@ -426,6 +907,9 @@ document.addEventListener("DOMContentLoaded", () => {
       
       // 설정 로드
       await loadSettings();
+
+      // 채팅 초기화(저장된 대화/active 복원)
+      await initializeChat();
       
       // 입력창에 포커스
       if (elements.inputBox) {

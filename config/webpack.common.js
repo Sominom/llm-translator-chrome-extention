@@ -8,6 +8,7 @@ const PATHS = require('./paths');
 
 // 이미지 파일 타입 정의
 const IMAGE_TYPES = /\.(png|jpe?g|gif|svg)$/i;
+const SHOULD_ANALYZE = process.env.ANALYZE === '1';
 
 module.exports = {
   // 번들 파일 출력 경로와 이름 정의
@@ -81,11 +82,12 @@ module.exports = {
       filename: 'css/[name].css',
     }),
 
-    new BundleAnalyzerPlugin({
-      analyzerMode: 'server',
-      analyzerHost: '127.0.0.1',
-      analyzerPort: 8888,
-      openAnalyzer: true,
-    }),
+    SHOULD_ANALYZE &&
+      new BundleAnalyzerPlugin({
+        analyzerMode: 'server',
+        analyzerHost: '127.0.0.1',
+        analyzerPort: 8888,
+        openAnalyzer: true,
+      }),
   ].filter(Boolean),
 };

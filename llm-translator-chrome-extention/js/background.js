@@ -252,6 +252,127 @@ async function callTranslationAPIStream(selectedText, settings, sender, requestI
   }
 }
 
+/**
+ * 스트리밍 채팅 API 호출 함수 (OpenAI 호환 /chat/completions)
+ * @param {Array<{role: 'system'|'user'|'assistant', content: string}>} messages
+ * @param {Object} settings
+ * @param {Object} sender
+ * @param {string} requestId
+ */
+async function callChatAPIStream(messages, settings, sender, requestId) {
+  const sendResponse = (message) => {
+    if (sender.tab?.id) {
+      chrome.tabs.sendMessage(sender.tab.id, message);
+    } else {
+      chrome.runtime.sendMessage(message);
+    }
+  };
+
+  try {
+    if (!settings.apiKey && settings.apiProvider === 'openai') {
+      throw new Error("API 키를 설정해주세요.");
+    }
+
+    let apiUrl = settings.apiUrl;
+    if (!apiUrl.endsWith('/')) apiUrl += '/';
+    const fetchUrl = apiUrl + 'chat/completions';
+
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    // 키가 없으면 Authorization 자체를 생략(ollama/lmstudio 등 호환 엔드포인트)
+    if (settings.apiKey) {
+      headers['Authorization'] = `Bearer ${settings.apiKey}`;
+    }
+
+    const response = await fetch(fetchUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: settings.apiModel || 'gpt-4',
+        messages: Array.isArray(messages) ? messages : [],
+        temperature: 0.8,
+        max_tokens: 2000,
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          sendResponse({
+            action: "chatStream",
+            requestId,
+            type: "complete"
+          });
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6);
+
+          if (data === '[DONE]') {
+            sendResponse({
+              action: "chatStream",
+              requestId,
+              type: "complete"
+            });
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+
+            if (content) {
+              sendResponse({
+                action: "chatStream",
+                requestId,
+                type: "chunk",
+                content
+              });
+            }
+          } catch (parseError) {
+            console.warn("JSON 파싱 오류:", parseError);
+          }
+        }
+      }
+    } catch (streamError) {
+      console.error("스트림 처리 오류:", streamError);
+      sendResponse({
+        action: "chatStream",
+        requestId,
+        type: "error",
+        error: "스트림 처리 중 오류가 발생했습니다."
+      });
+    }
+  } catch (error) {
+    console.error("채팅 오류:", error);
+    sendResponse({
+      action: "chatStream",
+      requestId,
+      type: "error",
+      error: error.message || "통신 오류가 발생했습니다."
+    });
+  }
+}
+
 // 설정 가져오기 함수
 async function getSettings() {
   return new Promise((resolve) => {
@@ -262,7 +383,8 @@ async function getSettings() {
       'apiUrl',
       'apiKey',
       'apiModel',
-      'isTooltipEnabled'
+      'isTooltipEnabled',
+      'disabledSites'
     ], (result) => {
       if (chrome.runtime.lastError) {
         console.error("설정 가져오기 오류:", chrome.runtime.lastError);
@@ -310,27 +432,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === "install") {
     console.log("신규 설치: 웰컴 페이지 열기");
     chrome.tabs.create({ url: welcomePage });
-  }
-
-  try {
-    // 사이드 패널 설정
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
-    console.log("사이드 패널 행동 설정 완료");
-
-    // declarativeContent API 설정 - 모든 웹 페이지에서 활성화
-    chrome.declarativeContent.onPageChanged.removeRules(undefined, () => {
-      chrome.declarativeContent.onPageChanged.addRules([{
-        conditions: [
-          new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { schemes: ['http', 'https'] },
-          })
-        ],
-        actions: [new chrome.declarativeContent.ShowAction()]
-      }]);
-    });
-
-  } catch (error) {
-    console.error("사이드 패널 행동 설정 오류:", error);
   }
 });
 
@@ -383,6 +484,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true; // 비동기 응답을 위해 true 반환
+  }
+
+  // 스트리밍 채팅 요청 처리
+  if (request.action === "chatStream") {
+    (async () => {
+      try {
+        const settings = await getSettings();
+        await callChatAPIStream(request.messages, settings, sender, request.requestId);
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error("스트리밍 채팅 오류:", error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
   }
 
   // 번역 취소 요청 처리

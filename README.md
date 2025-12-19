@@ -4,7 +4,7 @@
 
 1. **프로덕션 빌드 생성**
     - `llm-translator-chrome-extention/manifest.json`의 `version` 수정
-    - `llm-translator-chrome-extention/manifest.json`의 `name` 을 `Quick Translator Dev`에서 `Quick Translator`로 수정
+    - `llm-translator-chrome-extention/manifest.json`의 `name` 을 `LLM Translator Dev`에서 `LLM Translator`로 수정
    ```bash
    npm run build
    ```
