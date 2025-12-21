@@ -445,8 +445,6 @@ chrome.action.onClicked.addListener(async (tab) => {
     console.log("아이콘 클릭으로 사이드 패널 열림");
   } catch (error) {
     console.error("사이드 패널 열기 오류:", error);
-    // 오류 발생 시 탭 URL 기록 (디버깅용)
-    console.error("문제가 발생한 탭 URL:", tab.url);
   }
 });
 
