@@ -1,5 +1,8 @@
 # 크롬 번역 확장 프로그램
 
+## Chrome 웹스토어
+https://chromewebstore.google.com/detail/llm-translator/pnimpbjdlocedfmiebkjcdhhnpohphna
+
 ## 크롬 확장 프로그램 빌드
 
 1. **프로덕션 빌드 생성**
