@@ -35,4 +35,10 @@ for (const listener of [...listeners]) {
 }
 await chat;
 
+chrome.runtime = undefined;
+await assert.rejects(
+  window.translationAPI.translateWithStream('stale context'),
+  /페이지를 새로고침해주세요/
+);
+
 console.log('request cancellation: ok');
