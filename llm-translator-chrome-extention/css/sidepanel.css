@@ -611,6 +611,27 @@ input:checked+.slider:before {
   background-color: #3367d6;
 }
 
+.test-button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 15px;
+  color: #3367d6;
+  background: white;
+  border: 1px solid #4285f4;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: 'Paperlogy-6ExtraBold';
+}
+
+.test-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.test-button + .save-button {
+  margin-top: 8px;
+}
+
 /* 사이드바 버튼 스타일 */
 .sidebar-toggle {
   position: fixed;

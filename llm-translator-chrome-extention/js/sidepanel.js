@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
     apiUrl: document.querySelector("#api-url"),
     apiKey: document.querySelector("#api-key"),
     apiModel: document.querySelector("#api-model"),
+    testApiBtn: document.querySelector("#test-api-connection"),
     saveBtn: document.querySelector("#save-settings"),
     tabButtons: document.querySelectorAll(".tab-button"),
     tabContents: document.querySelectorAll(".tab-content"),
@@ -29,8 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chatSendBtn: document.querySelector("#chat-send-btn")
   };
 
-  let isTranslating = false;
-  let currentRequestId = null;
+  let translationVersion = 0;
 
   // Chat state
   const CHAT_STORAGE_KEY_CONVERSATIONS = "chatConversations";
@@ -41,61 +41,48 @@ document.addEventListener("DOMContentLoaded", () => {
   let chatConversations = [];
   let activeChatConversationId = null;
   let isChatStreaming = false;
-  let currentChatRequestId = null;
   let chatPersistTimer = null;
 
   async function translateText(text, translationLang, learningLang) {
+    const version = ++translationVersion;
+
     if (!text.trim()) {
+      window.translationAPI?.cancelAllTranslations();
       if (elements.outputBox) {
         elements.outputBox.textContent = "";
       }
       return;
     }
 
-    if (isTranslating) {
-      console.log("이미 번역 중입니다.");
-      return;
-    }
-
-    isTranslating = true;
-    
     if (elements.outputBox) {
       elements.outputBox.textContent = "번역 중...";
     }
 
     try {
       await waitForAPI();
-
-      currentRequestId = Date.now().toString();
+      if (version !== translationVersion) return;
+      window.translationAPI.cancelAllTranslations();
 
       await window.translationAPI.translateWithStream(text, {
         onStreamUpdate: (chunk, accumulated, data) => {
-          if (data.type === 'chunk' && elements.outputBox) {
+          if (version === translationVersion && data.type === 'chunk' && elements.outputBox) {
             elements.outputBox.textContent = accumulated;
           }
         },
         onComplete: (finalText) => {
           console.log("번역 완료:", finalText);
-          if (elements.outputBox) {
+          if (version === translationVersion && elements.outputBox) {
             elements.outputBox.textContent = finalText;
           }
-        },
-        onError: (error) => {
-          console.error("번역 오류:", error);
-          if (elements.outputBox) {
-            elements.outputBox.textContent = "번역 중 오류가 발생했습니다: " + error.message;
-          }
         }
-      }, true, translationLang, learningLang);
+      }, translationLang, learningLang);
 
     } catch (error) {
+      if (error.name === 'AbortError') return;
       console.error("번역 오류:", error);
-      if (elements.outputBox) {
-        elements.outputBox.textContent = "번역 중 오류가 발생했습니다.";
+      if (version === translationVersion && elements.outputBox) {
+        elements.outputBox.textContent = error.message || "번역 중 오류가 발생했습니다.";
       }
-    } finally {
-      isTranslating = false;
-      currentRequestId = null;
     }
   }
 
@@ -525,7 +512,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderChatMessages();
 
     isChatStreaming = true;
-    currentChatRequestId = Date.now().toString();
     if (elements.chatSendBtn) elements.chatSendBtn.disabled = true;
 
     const requestMessages = buildChatRequestMessages(chatConversations.find((c) => c.id === convoId));
@@ -537,15 +523,13 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         onComplete: (finalText) => {
           updateAssistantMessage(convoId, assistantMsgId, finalText);
-        },
-        onError: (error) => {
-          console.error("채팅 오류:", error);
-          updateAssistantMessage(convoId, assistantMsgId, `오류: ${error.message || "채팅 중 오류가 발생했습니다."}`);
         }
       });
+    } catch (error) {
+      console.error("채팅 오류:", error);
+      updateAssistantMessage(convoId, assistantMsgId, `오류: ${error.message || "채팅 중 오류가 발생했습니다."}`);
     } finally {
       isChatStreaming = false;
-      currentChatRequestId = null;
       if (elements.chatSendBtn) elements.chatSendBtn.disabled = false;
     }
   }
@@ -675,14 +659,43 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function getApiSettingsFromForm() {
+    return {
+      apiProvider: elements.apiProvider?.value || 'openai',
+      apiUrl: elements.apiUrl?.value || 'https://api.openai.com/v1/',
+      apiKey: elements.apiKey?.value || '',
+      apiModel: elements.apiModel?.value || 'gpt-4.1-nano'
+    };
+  }
+
+  function testApiConnection() {
+    const button = elements.testApiBtn;
+    if (!button) return;
+
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = "연결 확인 중...";
+    chrome.runtime.sendMessage(
+      { action: "testApiConnection", settings: getApiSettingsFromForm() },
+      (response) => {
+        button.disabled = false;
+        if (chrome.runtime.lastError || !response?.success) {
+          button.textContent = originalText;
+          alert(response?.error || chrome.runtime.lastError?.message || "API 연결에 실패했습니다.");
+          return;
+        }
+
+        button.textContent = "연결 성공!";
+        setTimeout(() => { button.textContent = originalText; }, 2000);
+      }
+    );
+  }
+
   function saveSettings() {
     try {
       chrome.storage.local.get(['disabledSites'], (result) => { 
         const settings = {
-          apiProvider: elements.apiProvider?.value || 'openai',
-          apiUrl: elements.apiUrl?.value || 'https://api.openai.com/v1/',
-          apiKey: elements.apiKey?.value || '',
-          apiModel: elements.apiModel?.value || 'gpt-4.1-nano',
+          ...getApiSettingsFromForm(),
           learningLanguage: elements.learningLang?.value || 'en',
           defaultLanguage: elements.translationLang?.value || 'ko',
           isTooltipEnabled: elements.isTooltipEnabled?.checked !== false,
@@ -814,6 +827,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.saveBtn) {
       elements.saveBtn.addEventListener("click", saveSettings);
     }
+
+    if (elements.testApiBtn) {
+      elements.testApiBtn.addEventListener("click", testApiConnection);
+    }
     
     // 툴팁 토글 이벤트
     if (elements.isTooltipEnabled) {
@@ -865,18 +882,6 @@ document.addEventListener("DOMContentLoaded", () => {
         e.stopPropagation();
         infoTooltip.classList.remove("show");
       });
-    }
-  }
-
-  // 번역 취소 함수
-  function cancelTranslation() {
-    if (currentRequestId && window.translationAPI) {
-      window.translationAPI.cancelTranslation(currentRequestId);
-      isTranslating = false;
-      if (elements.outputBox) {
-        elements.outputBox.textContent = "번역이 취소되었습니다.";
-      }
-      currentRequestId = null;
     }
   }
 

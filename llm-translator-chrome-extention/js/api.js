@@ -48,9 +48,9 @@ class TranslationAPI {
    * @param {Function} options.onError - 에러 콜백
    * @returns {Promise<string>} 최종 번역 결과
    */
-  async translateWithStream(text, options = {}, isSidePanel, targetLanguage, learningLanguage) {
+  async translateWithStream(text, options = {}, targetLanguage, learningLanguage) {
     const { onStreamUpdate, onComplete, onError } = options;
-    const requestId = Date.now().toString();
+    const requestId = crypto.randomUUID();
     
     return new Promise((resolve, reject) => {
       let accumulatedText = '';
@@ -89,13 +89,12 @@ class TranslationAPI {
       
       try {
         chrome.runtime.onMessage.addListener(streamListener);
-        this.activeRequests.set(requestId, { listener: streamListener, text });
+        this.activeRequests.set(requestId, { listener: streamListener, reject, kind: 'translation' });
         
         chrome.runtime.sendMessage({ 
           action: "translateStream", 
           text: text,
           requestId: requestId,
-          isSidePanel: isSidePanel,
           targetLanguage: targetLanguage,
           learningLanguage: learningLanguage
         }, (response) => {
@@ -139,7 +138,7 @@ class TranslationAPI {
    */
   async chatWithStream(messages, options = {}) {
     const { onStreamUpdate, onComplete, onError } = options;
-    const requestId = Date.now().toString();
+    const requestId = crypto.randomUUID();
 
     return new Promise((resolve, reject) => {
       let accumulatedText = '';
@@ -174,7 +173,7 @@ class TranslationAPI {
 
       try {
         chrome.runtime.onMessage.addListener(streamListener);
-        this.activeRequests.set(requestId, { listener: streamListener, messages });
+        this.activeRequests.set(requestId, { listener: streamListener, reject, kind: 'chat' });
 
         chrome.runtime.sendMessage(
           {
@@ -226,6 +225,10 @@ class TranslationAPI {
         action: "cancelTranslation",
         requestId: requestId
       });
+
+      const error = new Error("요청이 취소되었습니다.");
+      error.name = 'AbortError';
+      request.reject(error);
     }
   }
 
@@ -233,8 +236,8 @@ class TranslationAPI {
    * 모든 번역 요청 취소
    */
   cancelAllTranslations() {
-    for (const [requestId] of this.activeRequests) {
-      this.cancelTranslation(requestId);
+    for (const [requestId, request] of this.activeRequests) {
+      if (request.kind === 'translation') this.cancelTranslation(requestId);
     }
   }
 }

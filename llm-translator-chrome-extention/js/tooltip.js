@@ -15,11 +15,11 @@ let tooltipText;
 let tooltipCloseBtn;
 let tooltipMenuBtn;
 let tooltipMenuDropdown;
-let isTranslating = false;
 let lastSelectionText = "";
 let disabledSites = [];
 let lastSelectionRange = null;
 let repositionScheduled = false;
+let tooltipRequestVersion = 0;
 
 function globToRegex(pattern) {
   // * 제외 특수 문자 이스케이프
@@ -184,7 +184,7 @@ function setupTextSelection() {
   });
 
   document.addEventListener("mouseup", async (event) => {
-    if (!isTooltipEnabled || isTranslating) return;
+    if (!isTooltipEnabled) return;
 
     const selectedText = window.getSelection().toString().trim();
     const selection = window.getSelection();
@@ -208,7 +208,7 @@ function setupTextSelection() {
       }
 
       try {
-        await showTooltip(event, selectedText);
+        await showTooltip(selectedText);
       } catch (error) {
         console.error("툴팁 표시 오류:", error);
       }
@@ -219,10 +219,11 @@ function setupTextSelection() {
   });
 }
 
-async function showTooltip(event, text) {
-  if (!tooltipContainer || isTranslating) return;
+async function showTooltip(text) {
+  if (!tooltipContainer) return;
 
-  isTranslating = true;
+  const version = ++tooltipRequestVersion;
+  window.translationAPI.cancelAllTranslations();
   tooltipText.textContent = "번역 중...";
   tooltipContainer.style.display = "block";
 
@@ -232,37 +233,38 @@ async function showTooltip(event, text) {
   try {
     await window.translationAPI.translateWithStream(text, {
       onStreamUpdate: (chunk, accumulated, data) => {
-        if (data.type === 'chunk') {
+        if (version === tooltipRequestVersion && data.type === 'chunk') {
           tooltipText.textContent = accumulated;
           scheduleTooltipReposition();
         }
       },
       onComplete: (finalText) => {
         console.log("툴팁 번역 완료:", finalText);
-        tooltipText.textContent = finalText;
-        scheduleTooltipReposition();
-      },
-      onError: (error) => {
-        console.error("툴팁 번역 오류:", error);
-        tooltipText.textContent = error ? error.message : "번역 중 오류가 발생했습니다.";
-        setTimeout(hideTooltip, 3000);
+        if (version === tooltipRequestVersion) {
+          tooltipText.textContent = finalText;
+          scheduleTooltipReposition();
+        }
       }
-    }, false);
+    });
   } catch (error) {
+    if (error.name === 'AbortError') return;
     console.error("툴팁 번역 오류:", error);
-    tooltipText.textContent = error ? error.message : "번역 중 오류가 발생했습니다.";
-    setTimeout(hideTooltip, 3000);
-  } finally {
-    isTranslating = false;
+    if (version === tooltipRequestVersion) {
+      tooltipText.textContent = error.message || "번역 중 오류가 발생했습니다.";
+      setTimeout(() => {
+        if (version === tooltipRequestVersion) hideTooltip();
+      }, 3000);
+    }
   }
 }
 
 function hideTooltip() {
+  tooltipRequestVersion++;
+  window.translationAPI?.cancelAllTranslations();
   if (tooltipContainer) {
     tooltipContainer.style.display = "none";
     tooltipMenuDropdown.style.display = "none";
   }
-  isTranslating = false;
   lastSelectionRange = null;
 }
 

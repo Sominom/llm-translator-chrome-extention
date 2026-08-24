@@ -16,3 +16,15 @@ export function createChatCompletionBody(settings, messages, maxTokens, stream =
   if (stream) body.stream = true;
   return body;
 }
+
+export function formatApiError(status, statusText, details) {
+  const detail = typeof details?.error?.message === 'string'
+    ? details.error.message
+    : typeof details?.message === 'string'
+      ? details.message
+      : '';
+  const suffix = detail.replace(/\s+/g, ' ').trim().slice(0, 500);
+  return suffix
+    ? `API 오류 (${status}): ${suffix}`
+    : `API 오류 (${status}${statusText ? ` ${statusText}` : ''})`;
+}
