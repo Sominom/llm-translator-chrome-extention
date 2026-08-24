@@ -3,6 +3,20 @@
  * Chrome Extension의 모든 컴포넌트에서 사용할 수 있는 통합 API 인터페이스
  */
 
+const CONTEXT_INVALIDATED_MESSAGE = "확장 프로그램이 업데이트되었습니다. 페이지를 새로고침해주세요.";
+
+function getRuntime() {
+  const runtime = globalThis.chrome?.runtime;
+  if (!runtime?.sendMessage || !runtime?.onMessage) {
+    throw new Error(CONTEXT_INVALIDATED_MESSAGE);
+  }
+  return runtime;
+}
+
+function removeRuntimeListener(runtime, listener) {
+  runtime?.onMessage?.removeListener?.(listener);
+}
+
 class TranslationAPI {
   constructor() {
     this.activeRequests = new Map(); // 활성 요청 관리
@@ -14,11 +28,13 @@ class TranslationAPI {
    */
   async getSettings() {
     return new Promise((resolve, reject) => {
+      let runtime;
       try {
-        chrome.runtime.sendMessage({ action: "getSettings" }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("설정 가져오기 오류:", chrome.runtime.lastError);
-            reject(chrome.runtime.lastError);
+        runtime = getRuntime();
+        runtime.sendMessage({ action: "getSettings" }, (response) => {
+          if (runtime.lastError) {
+            console.error("설정 가져오기 오류:", runtime.lastError);
+            reject(runtime.lastError);
             return;
           }
           
@@ -30,11 +46,9 @@ class TranslationAPI {
           }
         });
       } catch (error) {
-        if (error.message.includes("Extension context invalidated")) {
-          reject(new Error("확장 프로그램이 업데이트되었습니다. 페이지를 새로고침해주세요."));
-        } else {
-          reject(error);
-        }
+        reject(error.message?.includes("Extension context invalidated")
+          ? new Error(CONTEXT_INVALIDATED_MESSAGE)
+          : error);
       }
     });
   }
@@ -54,6 +68,7 @@ class TranslationAPI {
     
     return new Promise((resolve, reject) => {
       let accumulatedText = '';
+      let runtime;
       
       // 스트림 리스너
       const streamListener = (message) => {
@@ -66,7 +81,7 @@ class TranslationAPI {
             }
           } else if (message.type === 'complete') {
             // 번역 완료
-            chrome.runtime.onMessage.removeListener(streamListener);
+            removeRuntimeListener(runtime, streamListener);
             this.activeRequests.delete(requestId);
             
             if (onComplete) {
@@ -75,7 +90,7 @@ class TranslationAPI {
             resolve(accumulatedText);
           } else if (message.type === 'error') {
             // 에러 처리
-            chrome.runtime.onMessage.removeListener(streamListener);
+            removeRuntimeListener(runtime, streamListener);
             this.activeRequests.delete(requestId);
             
             const error = new Error(message.error || '번역 중 오류가 발생했습니다.');
@@ -88,22 +103,23 @@ class TranslationAPI {
       };
       
       try {
-        chrome.runtime.onMessage.addListener(streamListener);
+        runtime = getRuntime();
+        runtime.onMessage.addListener(streamListener);
         this.activeRequests.set(requestId, { listener: streamListener, reject, kind: 'translation' });
         
-        chrome.runtime.sendMessage({ 
+        runtime.sendMessage({
           action: "translateStream", 
           text: text,
           requestId: requestId,
           targetLanguage: targetLanguage,
           learningLanguage: learningLanguage
         }, (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("번역 요청 오류:", chrome.runtime.lastError);
-            chrome.runtime.onMessage.removeListener(streamListener);
+          if (runtime.lastError) {
+            console.error("번역 요청 오류:", runtime.lastError);
+            removeRuntimeListener(runtime, streamListener);
             this.activeRequests.delete(requestId);
             
-            const error = new Error(chrome.runtime.lastError.message);
+            const error = new Error(runtime.lastError.message);
             if (onError) {
               onError(error);
             }
@@ -111,11 +127,11 @@ class TranslationAPI {
           }
         });
       } catch (error) {
-        chrome.runtime.onMessage.removeListener(streamListener);
+        removeRuntimeListener(runtime, streamListener);
         this.activeRequests.delete(requestId);
         
         const errorMessage = error.message.includes("Extension context invalidated") 
-          ? "확장 프로그램이 업데이트되었습니다. 페이지를 새로고침해주세요."
+          ? CONTEXT_INVALIDATED_MESSAGE
           : error.message;
           
         const wrappedError = new Error(errorMessage);
@@ -142,6 +158,7 @@ class TranslationAPI {
 
     return new Promise((resolve, reject) => {
       let accumulatedText = '';
+      let runtime;
 
       const streamListener = (message) => {
         if (message.action === "chatStream" && message.requestId === requestId) {
@@ -151,7 +168,7 @@ class TranslationAPI {
               onStreamUpdate(message.content, accumulatedText, { type: 'chunk' });
             }
           } else if (message.type === 'complete') {
-            chrome.runtime.onMessage.removeListener(streamListener);
+            removeRuntimeListener(runtime, streamListener);
             this.activeRequests.delete(requestId);
 
             if (onComplete) {
@@ -159,7 +176,7 @@ class TranslationAPI {
             }
             resolve(accumulatedText);
           } else if (message.type === 'error') {
-            chrome.runtime.onMessage.removeListener(streamListener);
+            removeRuntimeListener(runtime, streamListener);
             this.activeRequests.delete(requestId);
 
             const error = new Error(message.error || '채팅 중 오류가 발생했습니다.');
@@ -172,22 +189,23 @@ class TranslationAPI {
       };
 
       try {
-        chrome.runtime.onMessage.addListener(streamListener);
+        runtime = getRuntime();
+        runtime.onMessage.addListener(streamListener);
         this.activeRequests.set(requestId, { listener: streamListener, reject, kind: 'chat' });
 
-        chrome.runtime.sendMessage(
+        runtime.sendMessage(
           {
             action: "chatStream",
             requestId,
             messages,
           },
           () => {
-            if (chrome.runtime.lastError) {
-              console.error("채팅 요청 오류:", chrome.runtime.lastError);
-              chrome.runtime.onMessage.removeListener(streamListener);
+            if (runtime.lastError) {
+              console.error("채팅 요청 오류:", runtime.lastError);
+              removeRuntimeListener(runtime, streamListener);
               this.activeRequests.delete(requestId);
 
-              const error = new Error(chrome.runtime.lastError.message);
+              const error = new Error(runtime.lastError.message);
               if (onError) {
                 onError(error);
               }
@@ -196,11 +214,11 @@ class TranslationAPI {
           }
         );
       } catch (error) {
-        chrome.runtime.onMessage.removeListener(streamListener);
+        removeRuntimeListener(runtime, streamListener);
         this.activeRequests.delete(requestId);
 
         const errorMessage = error.message.includes("Extension context invalidated")
-          ? "확장 프로그램이 업데이트되었습니다. 페이지를 새로고침해주세요."
+          ? CONTEXT_INVALIDATED_MESSAGE
           : error.message;
 
         const wrappedError = new Error(errorMessage);
@@ -218,10 +236,11 @@ class TranslationAPI {
   cancelTranslation(requestId) {
     if (this.activeRequests.has(requestId)) {
       const request = this.activeRequests.get(requestId);
-      chrome.runtime.onMessage.removeListener(request.listener);
+      const runtime = globalThis.chrome?.runtime;
+      removeRuntimeListener(runtime, request.listener);
       this.activeRequests.delete(requestId);
       
-      chrome.runtime.sendMessage({
+      runtime?.sendMessage?.({
         action: "cancelTranslation",
         requestId: requestId
       });
