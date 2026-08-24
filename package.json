@@ -4,8 +4,7 @@
   "description": "LLM을 이용한 간단한 크롬 사이드패널 번역 및 툴팁 번역기",
   "private": true,
   "scripts": {
-    "build": "webpack --config config/webpack.config.js",
-    "build:dev": "export ANALYZE=1 && webpack --config config/webpack.config.js",
+    "build": "npm run icon && webpack --config config/webpack.config.js",
     "icon": "node scripts/resize_icon.js",
     "test": "node scripts/chat-completion.test.mjs && node scripts/api.test.mjs"
   },
