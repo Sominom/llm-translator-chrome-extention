@@ -65,6 +65,7 @@ module.exports = {
           globOptions: {
             ignore: [
               '**/*.js',
+              '**/*.mjs',
               '**/manifest.json',
             ],
           },

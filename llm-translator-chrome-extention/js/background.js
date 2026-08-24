@@ -1,3 +1,5 @@
+import { createChatCompletionBody } from './chat-completion.mjs';
+
 const welcomePage = "template/welcome.html";
 const sidePanelPage = "template/sidepanel.html";
 
@@ -50,9 +52,7 @@ async function detectLanguage(text, settings) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify({
-        model: settings.apiModel,
-        messages: [
+      body: JSON.stringify(createChatCompletionBody(settings, [
           {
             role: 'system',
             content: '당신은 텍스트의 언어를 감지하는 언어 감지기입니다. 감지된 언어 코드만 간단히 반환하세요. 반드시 번역만 제공하고 다른 설명은 절대 하지마세요. "알겠습니다." 등의 대답도 절대 하지마세요. 가능한 언어 코드: ko(한국어), en(영어), ja(일본어), zh(중국어), es(스페인어), fr(프랑스어), de(독일어), ru(러시아어), it(이탈리아어), pt(포르투갈어)'
@@ -61,10 +61,7 @@ async function detectLanguage(text, settings) {
             role: 'user',
             content: `다음 텍스트의 언어를 감지: "${text}". 반드시 언어 코드만 반환하세요. 감지 결과: `
           }
-        ],
-        temperature: 0.1,
-        max_tokens: 10
-      })
+        ], 256, false, 0.1))
     });
 
     if (!response.ok) {
@@ -157,13 +154,7 @@ async function callTranslationAPIStream(selectedText, settings, sender, requestI
     const response = await fetch(fetchUrl, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({
-        model: settings.apiModel || 'gpt-4.1-nano',
-        messages: messages,
-        temperature: 0.8,
-        max_tokens: 2000,
-        stream: true
-      })
+      body: JSON.stringify(createChatCompletionBody(settings, messages, 2000, true))
     });
 
     if (!response.ok) {
@@ -289,13 +280,12 @@ async function callChatAPIStream(messages, settings, sender, requestId) {
     const response = await fetch(fetchUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        model: settings.apiModel || 'gpt-4.1-nano',
-        messages: Array.isArray(messages) ? messages : [],
-        temperature: 0.8,
-        max_tokens: 2000,
-        stream: true
-      })
+      body: JSON.stringify(createChatCompletionBody(
+        settings,
+        Array.isArray(messages) ? messages : [],
+        2000,
+        true
+      ))
     });
 
     if (!response.ok) {
