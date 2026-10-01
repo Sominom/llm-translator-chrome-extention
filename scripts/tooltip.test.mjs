@@ -3,9 +3,12 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 class Element {
-  constructor() { this.style = {}; this.children = []; this.listeners = {}; }
+  constructor() { this.style = {}; this.children = []; this.listeners = {}; this.attributes = {}; this.popoverOpen = false; }
   appendChild(child) { this.children.push(child); }
-  setAttribute() {}
+  setAttribute(name, value) { this.attributes[name] = value; }
+  matches(selector) { return selector === ':popover-open' && this.popoverOpen; }
+  showPopover() { assert.equal(this.attributes.popover, 'manual'); this.popoverOpen = true; }
+  hidePopover() { this.popoverOpen = false; }
   addEventListener(type, callback) { (this.listeners[type] ??= []).push(callback); }
   async emit(type, details = {}) {
     const event = { target: this, preventDefault() {}, stopPropagation() {}, ...details };
@@ -61,6 +64,7 @@ const instant = await harness();
 await instant.select('Hello 世界');
 assert.equal(instant.requests.length, 1);
 assert.equal(instant.requests[0].value, 'Hello 世界');
+assert.equal(instant.element('translation-tooltip').popoverOpen, true);
 await instant.select('Hello 世界');
 assert.equal(instant.requests.length, 2, 'same text can be selected again');
 
@@ -68,6 +72,14 @@ const icon = await harness({ tooltipMode: 'icon' });
 await icon.select('Hello 世界');
 const trigger = icon.element('translation-tooltip-trigger');
 assert.equal(trigger.style.display, 'block');
+assert.equal(trigger.popoverOpen, true);
+assert.equal(trigger.style.left, '210px');
+assert.equal(trigger.style.top, '56px');
+icon.window.scrollX = 500;
+icon.window.scrollY = 300;
+await icon.document.emit('scroll');
+assert.equal(trigger.style.left, '210px', 'top-layer position uses viewport coordinates');
+assert.equal(trigger.style.top, '56px');
 assert.equal(icon.requests.length, 0, 'selection alone must not call the API');
 await documentEventOnTrigger();
 async function documentEventOnTrigger() {
@@ -79,6 +91,8 @@ async function documentEventOnTrigger() {
 assert.equal(icon.requests.length, 1);
 assert.equal(icon.requests[0].value, 'Hello 世界');
 assert.equal(trigger.style.display, 'none');
+assert.equal(trigger.popoverOpen, false);
+assert.equal(icon.element('translation-tooltip').popoverOpen, true);
 await trigger.emit('click');
 assert.equal(icon.requests.length, 1, 'repeated click must not send a duplicate');
 await icon.select('Replacement');
@@ -86,6 +100,7 @@ icon.requests[0].callbacks.onComplete('stale response');
 assert.notEqual(icon.element('translation-tooltip').children[0].textContent, 'stale response');
 await icon.document.emit('keydown', { key: 'Escape' });
 assert.equal(trigger.style.display, 'none');
+assert.equal(icon.element('translation-tooltip').popoverOpen, false);
 await trigger.emit('click');
 assert.equal(icon.requests.length, 1);
 await icon.select('New selection');

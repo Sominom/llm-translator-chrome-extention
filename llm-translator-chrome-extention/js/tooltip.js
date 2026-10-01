@@ -72,6 +72,7 @@ function initTooltip() {
   if (tooltipContainer) return;
   translationTrigger = document.createElement('button');
   translationTrigger.id = 'translation-tooltip-trigger';
+  translationTrigger.setAttribute('popover', 'manual');
   translationTrigger.type = 'button';
   translationTrigger.textContent = '文A';
   translationTrigger.title = '선택한 텍스트 번역';
@@ -85,12 +86,13 @@ function initTooltip() {
     const text = pendingTranslationText;
     if (!text || !isTooltipEnabled) return;
     pendingTranslationText = '';
-    translationTrigger.style.display = 'none';
+    hideOverlay(translationTrigger);
     showTooltip(text);
   });
   document.body.appendChild(translationTrigger);
   tooltipContainer = document.createElement("div");
   tooltipContainer.id = "translation-tooltip";
+  tooltipContainer.setAttribute('popover', 'manual');
 
   tooltipText = document.createElement("div");
   tooltipText.id = "tooltip-text";
@@ -123,6 +125,26 @@ function initTooltip() {
   tooltipContainer.appendChild(tooltipMenuDropdown);
   tooltipContainer.appendChild(tooltipCloseBtn);
   document.body.appendChild(tooltipContainer);
+}
+
+function showOverlay(element) {
+  element.style.display = 'block';
+  // Popovers are promoted to the browser's top layer, above page stacking contexts.
+  if (element.showPopover && !element.matches(':popover-open')) {
+    try {
+      element.showPopover();
+    } catch (error) {
+      console.warn('최상위 레이어 표시 실패:', error);
+    }
+  }
+}
+
+function hideOverlay(element) {
+  if (!element) return;
+  if (element.hidePopover && element.matches(':popover-open')) {
+    element.hidePopover();
+  }
+  element.style.display = 'none';
 }
 
 // 메뉴 토글
@@ -239,7 +261,7 @@ function setupTextSelection() {
       try {
         if (tooltipMode === 'icon') {
           pendingTranslationText = selectedText;
-          translationTrigger.style.display = 'block';
+          showOverlay(translationTrigger);
           scheduleTooltipReposition();
         } else {
           await showTooltip(selectedText);
@@ -260,7 +282,7 @@ async function showTooltip(text) {
   const version = ++tooltipRequestVersion;
   window.translationAPI.cancelAllTranslations();
   tooltipText.textContent = "번역 중...";
-  tooltipContainer.style.display = "block";
+  showOverlay(tooltipContainer);
 
   // 초기 위치(선택 영역 기준) 설정
   scheduleTooltipReposition();
@@ -296,11 +318,11 @@ async function showTooltip(text) {
 function hideTooltip() {
   tooltipRequestVersion++;
   window.translationAPI?.cancelAllTranslations();
-  if (translationTrigger) translationTrigger.style.display = 'none';
+  hideOverlay(translationTrigger);
   pendingTranslationText = '';
   lastSelectionText = '';
   if (tooltipContainer) {
-    tooltipContainer.style.display = "none";
+    hideOverlay(tooltipContainer);
     tooltipMenuDropdown.style.display = "none";
   }
   lastSelectionRange = null;
@@ -331,19 +353,19 @@ function repositionTooltip() {
   // 툴팁 크기(뷰포트 기준)
   const tooltipRect = visibleElement.getBoundingClientRect();
 
-  // 기준 좌표는 "페이지 좌표"로 통일 (absolute 포지션)
-  const viewportLeft = window.scrollX;
-  const viewportTop = window.scrollY;
-  const viewportRight = viewportLeft + window.innerWidth;
-  const viewportBottom = viewportTop + window.innerHeight;
+  // Top-layer popovers use viewport coordinates.
+  const viewportLeft = 0;
+  const viewportTop = 0;
+  const viewportRight = window.innerWidth;
+  const viewportBottom = window.innerHeight;
 
   // 기본: 선택 영역 우측 상단 기준으로 위쪽에 띄움
-  let x = anchorRect.right + window.scrollX + 10;
-  let y = anchorRect.top + window.scrollY - tooltipRect.height - 10;
+  let x = anchorRect.right + 10;
+  let y = anchorRect.top - tooltipRect.height - 10;
 
   // 좌우 경계 보정
   if (x + tooltipRect.width > viewportRight) {
-    x = anchorRect.left + window.scrollX - tooltipRect.width - 10;
+    x = anchorRect.left - tooltipRect.width - 10;
   }
   if (x < viewportLeft + 10) {
     x = viewportLeft + 10;
@@ -351,7 +373,7 @@ function repositionTooltip() {
 
   // 상하 경계 보정
   if (y < viewportTop + 10) {
-    y = anchorRect.bottom + window.scrollY + 10;
+    y = anchorRect.bottom + 10;
   }
   if (y + tooltipRect.height > viewportBottom - 10) {
     y = viewportBottom - tooltipRect.height - 10;

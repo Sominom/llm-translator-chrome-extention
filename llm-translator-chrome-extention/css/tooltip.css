@@ -1,6 +1,8 @@
   #translation-tooltip-trigger {
     all: initial;
-    position: absolute;
+    position: fixed;
+    inset: auto;
+    margin: 0;
     display: none;
     box-sizing: border-box;
     width: 34px;
@@ -13,7 +15,7 @@
     font: 600 14px/32px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     text-align: center;
     cursor: pointer;
-    z-index: 10000;
+    z-index: 2147483647;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   }
 
@@ -27,14 +29,17 @@
   }
 
   #translation-tooltip {
-    position: absolute;
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    border: 0;
     background: #333;
     color: white;
     padding: 12px;
     border-radius: 8px;
     font-size: 14px;
     max-width: 300px;
-    z-index: 10000;
+    z-index: 2147483647;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     display: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
