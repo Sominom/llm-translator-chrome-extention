@@ -9,10 +9,10 @@
     "test": "node scripts/chat-completion.test.mjs && node scripts/api.test.mjs && node scripts/tooltip.test.mjs"
   },
   "devDependencies": {
-    "copy-webpack-plugin": "^10.2.4",
+    "copy-webpack-plugin": "^14.0.0",
     "css-loader": "^6.11.0",
     "mini-css-extract-plugin": "^2.9.4",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.5",
     "terser-webpack-plugin": "^5.3.16",
     "webpack": "^5.103.0",
     "webpack-bundle-analyzer": "^4.10.2",
