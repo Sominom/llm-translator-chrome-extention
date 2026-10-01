@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
     outputBox: document.querySelector("#output-box"),
     translationLang: document.querySelector("#translation-lang"),
     learningLang: document.querySelector("#learning-lang"),
+    defaultLanguageSetting: document.querySelector('#default-language'),
+    alternativeLanguageSetting: document.querySelector('#learning-language'),
     apiProvider: document.querySelector("#api-provider"),
     apiUrl: document.querySelector("#api-url"),
     apiKey: document.querySelector("#api-key"),
@@ -648,6 +650,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (elements.apiModel) elements.apiModel.value = settings.apiModel || 'gpt-4.1-nano';
       if (elements.learningLang) elements.learningLang.value = settings.learningLanguage || 'en';
       if (elements.translationLang) elements.translationLang.value = settings.defaultLanguage || 'ko';
+      if (elements.defaultLanguageSetting) elements.defaultLanguageSetting.value = settings.defaultLanguage || 'ko';
+      if (elements.alternativeLanguageSetting) elements.alternativeLanguageSetting.value = settings.learningLanguage || 'en';
       if (elements.isTooltipEnabled) elements.isTooltipEnabled.checked = settings.isTooltipEnabled !== false;
       if (elements.tooltipMode) elements.tooltipMode.value = settings.tooltipMode === 'icon' ? 'icon' : 'instant';
       
@@ -734,6 +738,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 이벤트 리스너 설정
   function setupEventListeners() {
+    // Keep the language controls in the translation and settings tabs in sync.
+    for (const [translationControl, settingControl] of [
+      [elements.translationLang, elements.defaultLanguageSetting],
+      [elements.learningLang, elements.alternativeLanguageSetting]
+    ]) {
+      translationControl?.addEventListener('change', () => {
+        if (settingControl) settingControl.value = translationControl.value;
+      });
+      settingControl?.addEventListener('change', () => {
+        if (translationControl) translationControl.value = settingControl.value;
+      });
+    }
     // 입력 이벤트 리스너
     if (elements.inputBox) {
       elements.inputBox.addEventListener("input", handleInput);
@@ -954,6 +970,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (settings.apiModel && elements.apiModel) elements.apiModel.value = settings.apiModel;
       if (settings.learningLanguage && elements.learningLang) elements.learningLang.value = settings.learningLanguage;
       if (settings.defaultLanguage && elements.translationLang) elements.translationLang.value = settings.defaultLanguage;
+      if (settings.defaultLanguage && elements.defaultLanguageSetting) elements.defaultLanguageSetting.value = settings.defaultLanguage;
+      if (settings.learningLanguage && elements.alternativeLanguageSetting) elements.alternativeLanguageSetting.value = settings.learningLanguage;
       if (settings.isTooltipEnabled !== undefined && elements.isTooltipEnabled) elements.isTooltipEnabled.checked = settings.isTooltipEnabled;
       if (settings.tooltipMode !== undefined && elements.tooltipMode) elements.tooltipMode.value = settings.tooltipMode === 'icon' ? 'icon' : 'instant';
     }
