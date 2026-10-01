@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
     apiUrl: document.querySelector("#api-url"),
     apiKey: document.querySelector("#api-key"),
     apiModel: document.querySelector("#api-model"),
+    refreshModelsBtn: document.querySelector('#refresh-models'),
+    modelListStatus: document.querySelector('#model-list-status'),
     testApiBtn: document.querySelector("#test-api-connection"),
     saveBtn: document.querySelector("#save-settings"),
     tabButtons: document.querySelectorAll(".tab-button"),
@@ -34,6 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   let translationVersion = 0;
+  let modelListRequestVersion = 0;
+  let modelsLoadedForSettings = false;
 
   // Chat state
   const CHAT_STORAGE_KEY_CONVERSATIONS = "chatConversations";
@@ -140,6 +144,9 @@ document.addEventListener("DOMContentLoaded", () => {
       urlInput.value = 'http://localhost:1234/v1/';
       keyInput.placeholder = 'API 키 (LMStudio는 선택사항)';
     }
+
+    invalidateModelList(true);
+    if (provider !== 'openai' || keyInput.value.trim()) refreshModels();
   }
 
   function switchTab(tabName) {
@@ -164,6 +171,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (tabName === "chat" && elements.chatInput) {
       // 탭 전환 직후 포커싱(렌더/레이아웃 안정화)
       setTimeout(() => elements.chatInput?.focus(), 0);
+    }
+    if (tabName === 'settings' && !modelsLoadedForSettings) {
+      const settings = getApiSettingsFromForm();
+      if (settings.apiProvider !== 'openai' || settings.apiKey) refreshModels();
     }
   }
 
@@ -639,6 +650,78 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function setModelStatus(message, isError = false) {
+    if (!elements.modelListStatus) return;
+    elements.modelListStatus.textContent = message;
+    elements.modelListStatus.classList.toggle('error', isError);
+  }
+
+  function renderModelOptions(models, selectedModel = '') {
+    const select = elements.apiModel;
+    if (!select) return;
+    select.replaceChildren();
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '모델을 선택하세요';
+    placeholder.disabled = true;
+    select.appendChild(placeholder);
+
+    const ids = [...new Set(models)];
+    if (selectedModel && !ids.includes(selectedModel)) {
+      const current = document.createElement('option');
+      current.value = selectedModel;
+      current.textContent = `${selectedModel} (현재 설정)`;
+      select.appendChild(current);
+    }
+    for (const id of ids) {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = id;
+      select.appendChild(option);
+    }
+    select.value = selectedModel || '';
+  }
+
+  function invalidateModelList(clearSelection = false) {
+    modelListRequestVersion++;
+    modelsLoadedForSettings = false;
+    if (elements.refreshModelsBtn) elements.refreshModelsBtn.disabled = false;
+    renderModelOptions([], clearSelection ? '' : elements.apiModel?.value || '');
+    setModelStatus('API 설정이 변경되었습니다. 모델을 다시 조회하세요.');
+  }
+
+  function refreshModels() {
+    const settings = getApiSettingsFromForm();
+    const selectedModel = elements.apiModel?.value || '';
+    const requestVersion = ++modelListRequestVersion;
+    if (settings.apiProvider === 'openai' && !settings.apiKey.trim()) {
+      setModelStatus('OpenAI 모델 조회에는 API 키가 필요합니다.', true);
+      return;
+    }
+
+    if (elements.refreshModelsBtn) elements.refreshModelsBtn.disabled = true;
+    setModelStatus('모델 목록을 조회하는 중...');
+    try {
+      chrome.runtime.sendMessage({ action: 'listModels', settings }, (response) => {
+        if (requestVersion !== modelListRequestVersion) return;
+        if (elements.refreshModelsBtn) elements.refreshModelsBtn.disabled = false;
+        if (chrome.runtime.lastError || !response?.success) {
+          setModelStatus(response?.error || chrome.runtime.lastError?.message || '모델 조회에 실패했습니다.', true);
+          return;
+        }
+        renderModelOptions(response.models, selectedModel);
+        modelsLoadedForSettings = true;
+        setModelStatus(response.models.length
+          ? `${response.models.length}개 모델을 조회했습니다.`
+          : '조회된 모델이 없습니다. 서버 설정을 확인하세요.', !response.models.length);
+      });
+    } catch (error) {
+      if (elements.refreshModelsBtn) elements.refreshModelsBtn.disabled = false;
+      setModelStatus(error.message || '모델 조회에 실패했습니다.', true);
+    }
+  }
+
   async function loadSettings() {
     try {
       const settings = await window.translationAPI.getSettings();
@@ -647,7 +730,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (elements.apiProvider) elements.apiProvider.value = settings.apiProvider || 'openai';
       if (elements.apiUrl) elements.apiUrl.value = settings.apiUrl || 'https://api.openai.com/v1/';
       if (elements.apiKey) elements.apiKey.value = settings.apiKey || '';
-      if (elements.apiModel) elements.apiModel.value = settings.apiModel || 'gpt-4.1-nano';
+      renderModelOptions([], settings.apiModel || 'gpt-4.1-nano');
+      modelsLoadedForSettings = false;
+      setModelStatus('모델을 조회하면 선택 가능한 목록이 표시됩니다.');
       if (elements.learningLang) elements.learningLang.value = settings.learningLanguage || 'en';
       if (elements.translationLang) elements.translationLang.value = settings.defaultLanguage || 'ko';
       if (elements.defaultLanguageSetting) elements.defaultLanguageSetting.value = settings.defaultLanguage || 'ko';
@@ -670,13 +755,17 @@ document.addEventListener("DOMContentLoaded", () => {
       apiProvider: elements.apiProvider?.value || 'openai',
       apiUrl: elements.apiUrl?.value || 'https://api.openai.com/v1/',
       apiKey: elements.apiKey?.value || '',
-      apiModel: elements.apiModel?.value || 'gpt-4.1-nano'
+      apiModel: elements.apiModel?.value || ''
     };
   }
 
   function testApiConnection() {
     const button = elements.testApiBtn;
     if (!button) return;
+    if (!elements.apiModel?.value) {
+      alert('모델을 조회하고 선택해주세요.');
+      return;
+    }
 
     const originalText = button.textContent;
     button.disabled = true;
@@ -699,6 +788,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function saveSettings() {
     try {
+      if (!elements.apiModel?.value) {
+        alert('모델을 조회하고 선택해주세요.');
+        return;
+      }
       chrome.storage.local.get(['disabledSites'], (result) => { 
         const settings = {
           ...getApiSettingsFromForm(),
@@ -841,6 +934,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (elements.apiProvider) {
       elements.apiProvider.addEventListener("change", handleProviderChange);
     }
+    elements.refreshModelsBtn?.addEventListener('click', refreshModels);
+    elements.apiUrl?.addEventListener('input', () => invalidateModelList());
+    elements.apiKey?.addEventListener('input', () => invalidateModelList());
     
     // 설정 저장 버튼
     if (elements.saveBtn) {
@@ -964,10 +1060,18 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       
       // 다른 UI 요소들도 필요시 업데이트
+      const sourceChanged = (settings.apiProvider && settings.apiProvider !== elements.apiProvider?.value)
+        || (settings.apiUrl && settings.apiUrl !== elements.apiUrl?.value)
+        || (settings.apiKey !== undefined && settings.apiKey !== elements.apiKey?.value);
       if (settings.apiProvider && elements.apiProvider) elements.apiProvider.value = settings.apiProvider;
       if (settings.apiUrl && elements.apiUrl) elements.apiUrl.value = settings.apiUrl;
-      if (settings.apiKey && elements.apiKey) elements.apiKey.value = settings.apiKey;
-      if (settings.apiModel && elements.apiModel) elements.apiModel.value = settings.apiModel;
+      if (settings.apiKey !== undefined && elements.apiKey) elements.apiKey.value = settings.apiKey;
+      if (sourceChanged) invalidateModelList(true);
+      if (settings.apiModel && elements.apiModel) {
+        const ids = Array.from(elements.apiModel.options, option => option.value).filter(Boolean);
+        if (!ids.includes(settings.apiModel)) renderModelOptions(ids, settings.apiModel);
+        else elements.apiModel.value = settings.apiModel;
+      }
       if (settings.learningLanguage && elements.learningLang) elements.learningLang.value = settings.learningLanguage;
       if (settings.defaultLanguage && elements.translationLang) elements.translationLang.value = settings.defaultLanguage;
       if (settings.defaultLanguage && elements.defaultLanguageSetting) elements.defaultLanguageSetting.value = settings.defaultLanguage;

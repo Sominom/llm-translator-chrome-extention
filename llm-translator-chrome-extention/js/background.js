@@ -1,4 +1,5 @@
 import { createChatCompletionBody, formatApiError } from './chat-completion.mjs';
+import { listAvailableModels } from './model-list.mjs';
 
 const welcomePage = "template/welcome.html";
 const sidePanelPage = "template/sidepanel.html";
@@ -424,7 +425,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // 다양한 메시지 리스너 처리
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("백그라운드 메시지 수신:", request);
+  console.log("백그라운드 메시지 수신:", request.action);
 
   // 설정 가져오기 요청 처리
   if (request.action === "getSettings") {
@@ -506,6 +507,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true });
       } catch (error) {
         sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+
+  if (request.action === "listModels") {
+    (async () => {
+      try {
+        const models = await listAvailableModels(request.settings);
+        sendResponse({ success: true, models });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message || '모델 목록을 조회할 수 없습니다.' });
       }
     })();
     return true;

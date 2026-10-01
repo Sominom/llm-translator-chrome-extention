@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run icon && webpack --config config/webpack.config.js",
     "icon": "node scripts/resize_icon.js",
-    "test": "node scripts/chat-completion.test.mjs && node scripts/api.test.mjs && node scripts/tooltip.test.mjs"
+    "test": "node scripts/chat-completion.test.mjs && node scripts/api.test.mjs && node scripts/tooltip.test.mjs && node scripts/model-list.test.mjs && node scripts/model-select.test.mjs"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^14.0.0",

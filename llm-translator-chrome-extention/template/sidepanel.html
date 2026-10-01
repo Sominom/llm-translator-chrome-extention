@@ -160,9 +160,15 @@
           <input type="password" id="api-key" class="setting-input" placeholder="sk-...">
         </div>
         <div class="setting-item">
-          <span>모델</span>
-          <input type="text" id="api-model" class="setting-input" placeholder="gpt-4.1-nano">
+          <label for="api-model">모델</label>
+          <div class="model-select-row">
+            <select id="api-model" class="setting-select">
+              <option value="" disabled selected>모델을 조회하세요</option>
+            </select>
+            <button id="refresh-models" class="model-refresh-button" type="button">조회</button>
+          </div>
         </div>
+        <p id="model-list-status" class="setting-desc" role="status" aria-live="polite"></p>
       </div>
 
       <button id="test-api-connection" class="test-button" type="button">API 연결 테스트</button>

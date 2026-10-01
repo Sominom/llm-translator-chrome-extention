@@ -593,6 +593,42 @@ input:checked+.slider:before {
   text-align: center;
 }
 
+.model-select-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 75%;
+}
+
+.model-select-row .setting-select {
+  min-width: 0;
+  width: 100%;
+}
+
+.model-refresh-button {
+  padding: 8px 10px;
+  border: 1px solid #4285f4;
+  border-radius: 4px;
+  color: #3367d6;
+  background: white;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.model-refresh-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+#model-list-status {
+  margin: -8px 0 16px;
+}
+
+#model-list-status.error {
+  color: #b42318;
+}
+
 .save-button {
   font-family: 'Paperlogy-6ExtraBold';
   width: 100%;
