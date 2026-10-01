@@ -1,6 +1,6 @@
 {
   "name": "llm-translator-chrome-extention",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "LLM을 이용한 간단한 크롬 사이드패널 번역 및 툴팁 번역기",
   "private": true,
   "scripts": {
