@@ -5,7 +5,9 @@ export function createChatCompletionBody(settings, messages, maxTokens, stream =
   if (settings.apiProvider === 'openai') {
     body.max_completion_tokens = maxTokens;
 
-    if (!/^gpt-5(?:[.-]|$)/i.test(model)) {
+    // GPT-5 and later use the model's default sampling settings.
+    const gptVersion = /^gpt-(\d+)(?:[.-]|$)/i.exec(model);
+    if (!gptVersion || Number(gptVersion[1]) < 5) {
       body.temperature = temperature;
     }
   } else {

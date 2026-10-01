@@ -6,6 +6,15 @@ import {
 
 const messages = [{ role: 'user', content: 'hello' }];
 
+for (const model of ['gpt-5', 'gpt-5-mini', 'gpt-6', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-2026-10-01', 'gpt-10']) {
+  for (const stream of [false, true]) {
+    const body = createChatCompletionBody({ apiProvider: 'openai', apiModel: model }, messages, 100, stream);
+    assert.equal('temperature' in body, false, model);
+    assert.equal(body.max_completion_tokens, 100);
+    assert.equal(body.stream, stream || undefined);
+  }
+}
+
 assert.deepEqual(
   createChatCompletionBody({ apiProvider: 'openai', apiModel: 'gpt-5.6' }, messages, 100, true),
   { model: 'gpt-5.6', messages, max_completion_tokens: 100, stream: true }
