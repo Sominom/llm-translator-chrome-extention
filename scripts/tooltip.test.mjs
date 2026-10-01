@@ -25,6 +25,8 @@ async function harness(settings = {}) {
   document.createElement = () => new Element();
   const window = new Element();
   const requests = [];
+  const copied = [];
+  const clipboard = { writeText: async text => { copied.push(text); } };
   const range = {
     cloneRange: () => range,
     getClientRects: () => [{ left: 100, right: 200, top: 100, bottom: 120, width: 100, height: 20 }]
@@ -43,12 +45,12 @@ async function harness(settings = {}) {
   let receive;
   const chrome = { runtime: { getURL: path => path, onMessage: { addListener: callback => { receive = callback; } } } };
   vm.runInNewContext(readFileSync(new URL('../llm-translator-chrome-extention/js/tooltip.js', import.meta.url), 'utf8'), {
-    document, window, chrome, URL, console: { log() {}, error() {} },
+    document, window, chrome, URL, navigator: { clipboard }, console: { log() {}, error() {} },
     requestAnimationFrame: callback => callback(), setTimeout
   });
   await window.emit('load');
   return {
-    document, window, requests,
+    document, window, requests, copied, clipboard,
     element: id => document.body.children.find(child => child.id === id),
     update: settings => receive({ action: 'settingsUpdated', settings }, {}, () => {}),
     async select(value) {
@@ -67,6 +69,23 @@ assert.equal(instant.requests[0].value, 'Hello 世界');
 assert.equal(instant.element('translation-tooltip').popoverOpen, true);
 await instant.select('Hello 世界');
 assert.equal(instant.requests.length, 2, 'same text can be selected again');
+
+const copyButton = instant.element('translation-tooltip').children.find(child => child.id === 'tooltip-copy-btn');
+assert.equal(copyButton.disabled, true, 'in-progress text must not be copied');
+await copyButton.emit('click');
+assert.deepEqual(instant.copied, []);
+const translated = '첫 문단\n\n1. 첫 항목\n2. <b>문자 그대로</b>';
+instant.requests[1].callbacks.onComplete(translated);
+assert.equal(copyButton.disabled, false);
+await copyButton.emit('click');
+assert.deepEqual(instant.copied, [translated], 'copy preserves paragraphs and literal markup');
+assert.equal(copyButton.textContent, '복사됨');
+instant.clipboard.writeText = async () => { throw new Error('Clipboard denied'); };
+await copyButton.emit('click');
+assert.equal(copyButton.textContent, '복사 실패 · 재시도');
+await instant.select('Another paragraph');
+assert.equal(copyButton.disabled, true);
+assert.equal(copyButton.textContent, '복사');
 
 const icon = await harness({ tooltipMode: 'icon' });
 await icon.select('Hello 世界');

@@ -16,6 +16,7 @@ let pendingTranslationText = '';
 let selectionListenersInitialized = false;
 let tooltipContainer;
 let tooltipText;
+let tooltipCopyBtn;
 let tooltipCloseBtn;
 let tooltipMenuBtn;
 let tooltipMenuDropdown;
@@ -96,6 +97,27 @@ function initTooltip() {
 
   tooltipText = document.createElement("div");
   tooltipText.id = "tooltip-text";
+  tooltipText.setAttribute('dir', 'auto');
+  tooltipText.setAttribute('tabindex', '0');
+  tooltipText.setAttribute('aria-label', '번역 결과');
+
+  tooltipCopyBtn = document.createElement('button');
+  tooltipCopyBtn.id = 'tooltip-copy-btn';
+  tooltipCopyBtn.type = 'button';
+  tooltipCopyBtn.textContent = '복사';
+  tooltipCopyBtn.disabled = true;
+  tooltipCopyBtn.setAttribute('aria-label', '번역 결과 복사');
+  tooltipCopyBtn.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    if (tooltipCopyBtn.disabled) return;
+    const version = tooltipRequestVersion;
+    try {
+      await navigator.clipboard.writeText(tooltipText.textContent);
+      if (version === tooltipRequestVersion) tooltipCopyBtn.textContent = '복사됨';
+    } catch {
+      if (version === tooltipRequestVersion) tooltipCopyBtn.textContent = '복사 실패 · 재시도';
+    }
+  });
 
   // 메뉴 버튼 생성
   tooltipMenuBtn = document.createElement("button");
@@ -118,9 +140,11 @@ function initTooltip() {
   tooltipCloseBtn = document.createElement("button");
   tooltipCloseBtn.innerHTML = "✕";
   tooltipCloseBtn.id = "tooltip-close-btn";
+  tooltipCloseBtn.setAttribute('aria-label', '번역 닫기');
   tooltipCloseBtn.addEventListener("click", hideTooltip);
 
   tooltipContainer.appendChild(tooltipText);
+  tooltipContainer.appendChild(tooltipCopyBtn);
   tooltipContainer.appendChild(tooltipMenuBtn);
   tooltipContainer.appendChild(tooltipMenuDropdown);
   tooltipContainer.appendChild(tooltipCloseBtn);
@@ -282,6 +306,9 @@ async function showTooltip(text) {
   const version = ++tooltipRequestVersion;
   window.translationAPI.cancelAllTranslations();
   tooltipText.textContent = "번역 중...";
+  tooltipText.scrollTop = 0;
+  tooltipCopyBtn.disabled = true;
+  tooltipCopyBtn.textContent = '복사';
   showOverlay(tooltipContainer);
 
   // 초기 위치(선택 영역 기준) 설정
@@ -299,6 +326,7 @@ async function showTooltip(text) {
         console.log("툴팁 번역 완료:", finalText);
         if (version === tooltipRequestVersion) {
           tooltipText.textContent = finalText;
+          tooltipCopyBtn.disabled = !finalText.trim();
           scheduleTooltipReposition();
         }
       }

@@ -29,29 +29,31 @@
   }
 
   #translation-tooltip {
+    box-sizing: border-box;
     position: fixed;
     inset: auto;
     margin: 0;
     border: 0;
     background: #333;
     color: white;
-    padding: 12px;
+    padding: 40px 16px 12px;
     border-radius: 8px;
     font-size: 14px;
-    max-width: 300px;
+    width: 420px;
+    max-width: calc(100vw - 20px);
     z-index: 2147483647;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     display: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    line-height: 1.4;
+    line-height: 1.75;
     word-wrap: break-word;
-    min-width: 200px;
+    min-width: 0;
   }
 
   #tooltip-close-btn {
     position: absolute;
-    top: 4px;
-    right: 4px;
+    top: 8px;
+    right: 8px;
     background: none;
     border: none;
     color: white;
@@ -62,8 +64,8 @@
     margin: 0;
     min-width: 12px;
     min-height: 12px;
-    width: 12px;
-    height: 12px;
+    width: 24px;
+    height: 24px;
     line-height: 12px;
     display: flex;
     justify-content: center;
@@ -76,15 +78,41 @@
   }
 
   #tooltip-text {
-    margin-bottom: 8px;
+    margin: 0;
     min-height: 20px;
+    max-height: min(60vh, calc(100vh - 80px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 4;
+    text-align: start;
   }
+
+  #translation-tooltip #tooltip-copy-btn {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    border: 1px solid #777;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 0;
+    background: transparent;
+    color: white;
+    font: 12px/20px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    cursor: pointer;
+  }
+
+  #translation-tooltip #tooltip-copy-btn:disabled { opacity: 0.45; cursor: default; }
+  #translation-tooltip #tooltip-copy-btn:enabled:hover { background: #505050; }
+  #translation-tooltip button:focus-visible,
+  #translation-tooltip #tooltip-text:focus-visible { outline: 2px solid #78b5ff; outline-offset: 2px; }
 
   /* 메뉴 버튼 스타일 */
   #translation-tooltip #tooltip-menu-btn {
     position: absolute;
-    top: 4px;
-    right: 19px;
+    top: 8px;
+    right: 36px;
     background: none;
     border: none;
     color: #ccc;
@@ -93,8 +121,8 @@
     border-radius: 2px;
     min-width: 12px;
     min-height: 12px;
-    width: 12px;
-    height: 12px;
+    width: 24px;
+    height: 24px;
     line-height: 12px;
     padding: 0;
     margin: 0;
@@ -112,7 +140,7 @@
   #translation-tooltip #tooltip-menu-dropdown {
     display: none;
     position: absolute;
-    top: 25px;
+    top: 36px;
     right: 5px;
     background-color: white;
     color: #333;

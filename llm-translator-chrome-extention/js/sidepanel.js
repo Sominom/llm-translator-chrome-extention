@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const elements = {
     inputBox: document.querySelector("#input-box"),
     outputBox: document.querySelector("#output-box"),
+    copyTranslation: document.querySelector('#copy-translation'),
     translationLang: document.querySelector("#translation-lang"),
     learningLang: document.querySelector("#learning-lang"),
     defaultLanguageSetting: document.querySelector('#default-language'),
@@ -52,6 +53,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function translateText(text, translationLang, learningLang) {
     const version = ++translationVersion;
+    if (elements.copyTranslation) {
+      elements.copyTranslation.disabled = true;
+      elements.copyTranslation.textContent = '복사';
+    }
 
     if (!text.trim()) {
       window.translationAPI?.cancelAllTranslations();
@@ -80,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
           console.log("번역 완료:", finalText);
           if (version === translationVersion && elements.outputBox) {
             elements.outputBox.textContent = finalText;
+            if (elements.copyTranslation) elements.copyTranslation.disabled = !finalText.trim();
           }
         }
       }, translationLang, learningLang);
@@ -123,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (text?.trim()) {
       translateText(text, translationLang, learningLang);
     } else if (elements.outputBox) {
-      elements.outputBox.textContent = "";
+      translateText('', translationLang, learningLang);
     }
   }, 500);
 
@@ -831,6 +837,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 이벤트 리스너 설정
   function setupEventListeners() {
+    elements.copyTranslation?.addEventListener('click', async () => {
+      if (elements.copyTranslation.disabled) return;
+      const version = translationVersion;
+      try {
+        await navigator.clipboard.writeText(elements.outputBox.textContent);
+        if (version === translationVersion) elements.copyTranslation.textContent = '복사됨';
+      } catch {
+        if (version === translationVersion) elements.copyTranslation.textContent = '복사 실패 · 재시도';
+      }
+    });
     // Keep the language controls in the translation and settings tabs in sync.
     for (const [translationControl, settingControl] of [
       [elements.translationLang, elements.defaultLanguageSetting],

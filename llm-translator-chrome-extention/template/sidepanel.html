@@ -44,7 +44,11 @@
         <textarea id="input-box" placeholder="번역할 텍스트를 입력하세요..."></textarea>
       </div>
       <div class="output-area">
-        <div id="output-box"></div>
+        <div class="translation-output-toolbar">
+          <span>번역 결과</span>
+          <button id="copy-translation" type="button" disabled aria-label="번역 결과 복사">복사</button>
+        </div>
+        <div id="output-box" dir="auto"></div>
       </div>
     </div>
   </div>
