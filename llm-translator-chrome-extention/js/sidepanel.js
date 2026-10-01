@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tabButtons: document.querySelectorAll(".tab-button"),
     tabContents: document.querySelectorAll(".tab-content"),
     isTooltipEnabled: document.querySelector("#tooltip-toggle"),
+    tooltipMode: document.querySelector("#tooltip-mode"),
     disabledSitesList: document.querySelector("#disabled-sites-list"),
     newSiteInput: document.querySelector("#new-site-input"),
     addSiteBtn: document.querySelector("#add-site-btn"),
@@ -648,6 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (elements.learningLang) elements.learningLang.value = settings.learningLanguage || 'en';
       if (elements.translationLang) elements.translationLang.value = settings.defaultLanguage || 'ko';
       if (elements.isTooltipEnabled) elements.isTooltipEnabled.checked = settings.isTooltipEnabled !== false;
+      if (elements.tooltipMode) elements.tooltipMode.value = settings.tooltipMode === 'icon' ? 'icon' : 'instant';
       
       // 제외 사이트 목록 렌더링
       if (settings.disabledSites) {
@@ -699,6 +701,7 @@ document.addEventListener("DOMContentLoaded", () => {
           learningLanguage: elements.learningLang?.value || 'en',
           defaultLanguage: elements.translationLang?.value || 'ko',
           isTooltipEnabled: elements.isTooltipEnabled?.checked !== false,
+          tooltipMode: elements.tooltipMode?.value || 'instant',
           disabledSites: result.disabledSites || []
         };
   
@@ -952,6 +955,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (settings.learningLanguage && elements.learningLang) elements.learningLang.value = settings.learningLanguage;
       if (settings.defaultLanguage && elements.translationLang) elements.translationLang.value = settings.defaultLanguage;
       if (settings.isTooltipEnabled !== undefined && elements.isTooltipEnabled) elements.isTooltipEnabled.checked = settings.isTooltipEnabled;
+      if (settings.tooltipMode !== undefined && elements.tooltipMode) elements.tooltipMode.value = settings.tooltipMode === 'icon' ? 'icon' : 'instant';
     }
   });
 });

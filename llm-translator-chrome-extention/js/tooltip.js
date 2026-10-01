@@ -10,6 +10,10 @@ function loadCSS($href) {
 loadCSS("css/tooltip.css");
 
 let isTooltipEnabled = true;
+let tooltipMode = 'instant';
+let translationTrigger;
+let pendingTranslationText = '';
+let selectionListenersInitialized = false;
 let tooltipContainer;
 let tooltipText;
 let tooltipCloseBtn;
@@ -65,6 +69,26 @@ async function waitForAPI() {
 }
 
 function initTooltip() {
+  if (tooltipContainer) return;
+  translationTrigger = document.createElement('button');
+  translationTrigger.id = 'translation-tooltip-trigger';
+  translationTrigger.type = 'button';
+  translationTrigger.textContent = '文A';
+  translationTrigger.title = '선택한 텍스트 번역';
+  translationTrigger.setAttribute('aria-label', '선택한 텍스트 번역');
+  translationTrigger.addEventListener('mousedown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  translationTrigger.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const text = pendingTranslationText;
+    if (!text || !isTooltipEnabled) return;
+    pendingTranslationText = '';
+    translationTrigger.style.display = 'none';
+    showTooltip(text);
+  });
+  document.body.appendChild(translationTrigger);
   tooltipContainer = document.createElement("div");
   tooltipContainer.id = "translation-tooltip";
 
@@ -162,6 +186,7 @@ window.addEventListener('load', async () => {
     
     const settings = await window.translationAPI.getSettings();
     isTooltipEnabled = settings.isTooltipEnabled !== false;
+    tooltipMode = settings.tooltipMode === 'icon' ? 'icon' : 'instant';
     disabledSites = settings.disabledSites || [];
     
     if (isTooltipEnabled) {
@@ -176,15 +201,19 @@ window.addEventListener('load', async () => {
 });
 
 function setupTextSelection() {
+  if (selectionListenersInitialized) return;
+  selectionListenersInitialized = true;
   document.addEventListener("selectionchange", () => {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.toString().trim()) {
       lastSelectionText = "";
+      if (pendingTranslationText) hideTooltip();
     }
   });
 
   document.addEventListener("mouseup", async (event) => {
     if (!isTooltipEnabled) return;
+    if (tooltipContainer?.contains(event.target) || translationTrigger?.contains(event.target)) return;
 
     const selectedText = window.getSelection().toString().trim();
     const selection = window.getSelection();
@@ -208,7 +237,13 @@ function setupTextSelection() {
       }
 
       try {
-        await showTooltip(selectedText);
+        if (tooltipMode === 'icon') {
+          pendingTranslationText = selectedText;
+          translationTrigger.style.display = 'block';
+          scheduleTooltipReposition();
+        } else {
+          await showTooltip(selectedText);
+        }
       } catch (error) {
         console.error("툴팁 표시 오류:", error);
       }
@@ -261,6 +296,9 @@ async function showTooltip(text) {
 function hideTooltip() {
   tooltipRequestVersion++;
   window.translationAPI?.cancelAllTranslations();
+  if (translationTrigger) translationTrigger.style.display = 'none';
+  pendingTranslationText = '';
+  lastSelectionText = '';
   if (tooltipContainer) {
     tooltipContainer.style.display = "none";
     tooltipMenuDropdown.style.display = "none";
@@ -283,14 +321,15 @@ function getSelectionAnchorClientRect() {
 }
 
 function repositionTooltip() {
-  if (!tooltipContainer) return;
-  if (tooltipContainer.style.display !== "block") return;
+  const visibleElement = translationTrigger?.style.display === 'block'
+    ? translationTrigger : tooltipContainer;
+  if (!visibleElement || visibleElement.style.display !== 'block') return;
 
   const anchorRect = getSelectionAnchorClientRect();
   if (!anchorRect) return;
 
   // 툴팁 크기(뷰포트 기준)
-  const tooltipRect = tooltipContainer.getBoundingClientRect();
+  const tooltipRect = visibleElement.getBoundingClientRect();
 
   // 기준 좌표는 "페이지 좌표"로 통일 (absolute 포지션)
   const viewportLeft = window.scrollX;
@@ -318,8 +357,8 @@ function repositionTooltip() {
     y = viewportBottom - tooltipRect.height - 10;
   }
 
-  tooltipContainer.style.left = `${x}px`;
-  tooltipContainer.style.top = `${y}px`;
+  visibleElement.style.left = `${x}px`;
+  visibleElement.style.top = `${y}px`;
 }
 
 function scheduleTooltipReposition() {
@@ -334,7 +373,7 @@ function scheduleTooltipReposition() {
 document.addEventListener("mousedown", (event) => {
   if (!tooltipContainer) return;
 
-  if (!tooltipContainer.contains(event.target)) {
+  if (!tooltipContainer.contains(event.target) && !translationTrigger?.contains(event.target)) {
     hideTooltip();
   }
 });
@@ -345,7 +384,6 @@ document.addEventListener(
   "scroll",
   () => {
     if (!tooltipContainer) return;
-    if (tooltipContainer.style.display !== "block") return;
     scheduleTooltipReposition();
   },
   { capture: true, passive: true }
@@ -353,7 +391,6 @@ document.addEventListener(
 
 window.addEventListener("resize", () => {
   if (!tooltipContainer) return;
-  if (tooltipContainer.style.display !== "block") return;
   scheduleTooltipReposition();
 });
 
@@ -381,11 +418,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   else if (message.action === "settingsUpdated") {
     // 설정 업데이트 시 로컬 동기화
     if (message.settings) {
+      hideTooltip();
+      if (message.settings.tooltipMode !== undefined) {
+        tooltipMode = message.settings.tooltipMode === 'icon' ? 'icon' : 'instant';
+      }
       if (message.settings.isTooltipEnabled !== undefined) {
         isTooltipEnabled = message.settings.isTooltipEnabled;
       }
       if (message.settings.disabledSites) {
         disabledSites = message.settings.disabledSites;
+      }
+      if (isTooltipEnabled) {
+        initTooltip();
+        setupTextSelection();
       }
     }
   }

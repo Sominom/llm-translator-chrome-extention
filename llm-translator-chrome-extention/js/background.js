@@ -13,6 +13,7 @@ const defaultSettings = {
   apiKey: '',
   apiModel: 'gpt-4.1-nano',
   isTooltipEnabled: true,
+  tooltipMode: 'instant',
   disabledSites: []
 };
 
@@ -349,6 +350,7 @@ async function getSettings() {
       'apiKey',
       'apiModel',
       'isTooltipEnabled',
+      'tooltipMode',
       'disabledSites'
     ], (result) => {
       if (chrome.runtime.lastError) {
@@ -365,6 +367,7 @@ async function getSettings() {
         apiKey: result.apiKey || defaultSettings.apiKey,
         apiModel: result.apiModel || defaultSettings.apiModel,
         isTooltipEnabled: result.isTooltipEnabled === undefined ? defaultSettings.isTooltipEnabled : result.isTooltipEnabled,
+        tooltipMode: result.tooltipMode === 'icon' ? 'icon' : defaultSettings.tooltipMode,
         disabledSites: result.disabledSites || defaultSettings.disabledSites
       };
 

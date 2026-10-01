@@ -1,3 +1,31 @@
+  #translation-tooltip-trigger {
+    all: initial;
+    position: absolute;
+    display: none;
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 8px;
+    background: #333;
+    color: #fff;
+    font: 600 14px/32px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+
+  #translation-tooltip-trigger:hover {
+    background: #505050;
+  }
+
+  #translation-tooltip-trigger:focus-visible {
+    outline: 2px solid #78b5ff;
+    outline-offset: 2px;
+  }
+
   #translation-tooltip {
     position: absolute;
     background: #333;
