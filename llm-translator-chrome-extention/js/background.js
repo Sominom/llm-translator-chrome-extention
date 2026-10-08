@@ -12,7 +12,7 @@ const defaultSettings = {
   apiProvider: 'openai',
   apiUrl: 'https://api.openai.com/v1/',
   apiKey: '',
-  apiModel: 'gpt-4.1-nano',
+  apiModel: 'gpt-6-luna',
   isTooltipEnabled: true,
   tooltipMode: 'instant',
   disabledSites: []

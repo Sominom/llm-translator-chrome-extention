@@ -736,7 +736,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (elements.apiProvider) elements.apiProvider.value = settings.apiProvider || 'openai';
       if (elements.apiUrl) elements.apiUrl.value = settings.apiUrl || 'https://api.openai.com/v1/';
       if (elements.apiKey) elements.apiKey.value = settings.apiKey || '';
-      renderModelOptions([], settings.apiModel || 'gpt-4.1-nano');
+      renderModelOptions([], settings.apiModel || 'gpt-6-luna');
       modelsLoadedForSettings = false;
       setModelStatus('모델을 조회하면 선택 가능한 목록이 표시됩니다.');
       if (elements.learningLang) elements.learningLang.value = settings.learningLanguage || 'en';

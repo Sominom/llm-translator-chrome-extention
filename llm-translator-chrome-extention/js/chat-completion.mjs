@@ -1,5 +1,5 @@
 export function createChatCompletionBody(settings, messages, maxTokens, stream = false, temperature = 0.8) {
-  const model = settings.apiModel || 'gpt-4.1-nano';
+  const model = settings.apiModel || 'gpt-6-luna';
   const body = { model, messages };
 
   if (settings.apiProvider === 'openai') {
